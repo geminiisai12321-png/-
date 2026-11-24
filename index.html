@@ -1,0 +1,956 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>AI 狼人殺</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&display=swap">
+<style>
+/* Layout: one-screen app. Seat grid and action panel on the left, table talk on the right; stacked on phones. */
+:root{
+  --bg:#edf0f7; --surface:#ffffff; --surface2:#e3e8f3; --fg:#171c36; --muted:#59628a; --line:#ccd3e6;
+  --accent:#8f5f0c; --accent-fg:#ffffff; --wolf:#b0352d; --good:#1d7664;
+  --night:#1a2045; --night-fg:#e9e7f5;
+  --serif:'Noto Serif TC','Songti TC','PMingLiU',serif;
+  --sans:'Noto Sans TC','PingFang TC','Microsoft JhengHei',system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1226; --surface:#171d3a; --surface2:#212849; --fg:#e8e6f4; --muted:#9aa3cc; --line:#2b3463;
+    --accent:#e8c468; --accent-fg:#1a1630; --wolf:#f0766b; --good:#5ec6b0; --night:#090c1f; --night-fg:#e8e6f4;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1226; --surface:#171d3a; --surface2:#212849; --fg:#e8e6f4; --muted:#9aa3cc; --line:#2b3463;
+  --accent:#e8c468; --accent-fg:#1a1630; --wolf:#f0766b; --good:#5ec6b0; --night:#090c1f; --night-fg:#e8e6f4;
+  color-scheme: dark;
+}
+html,body{height:100%;box-sizing:border-box}
+*,*::before,*::after{box-sizing:border-box}
+body{
+  background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.55;
+  padding-block:10px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.serif{font-family:var(--serif)}
+
+/* ---------- start screen ---------- */
+#start{height:100%;max-width:560px;margin:0 auto;display:flex;flex-direction:column;justify-content:center;gap:22px;overflow:auto;padding-block:8px}
+#start h1{font-family:var(--serif);font-weight:900;font-size:clamp(40px,12vw,64px);line-height:1.05;margin:0;letter-spacing:.04em;text-wrap:balance}
+#start .lede{margin:0;color:var(--muted);max-width:34em}
+.setup{display:grid;gap:10px}
+.setup .lab{font-size:13px;letter-spacing:.08em;color:var(--muted)}
+.seg{display:flex;flex-wrap:wrap;gap:8px}
+.seg button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 14px;min-height:40px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 18px;margin:0;padding:14px 0 0;border-top:1px solid var(--line);font-size:13.5px;color:var(--muted)}
+.rules dt{font-weight:700;color:var(--fg)}
+.rules dd{margin:0 0 6px}
+.btn{border:0;background:var(--accent);color:var(--accent-fg);border-radius:8px;padding:12px 22px;font-weight:700;min-height:46px}
+.btn.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.btn.sm{padding:6px 12px;min-height:36px;font-weight:500;font-size:14px}
+.btn.tog[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.btn[disabled]{opacity:.5;cursor:default}
+@media (max-width:640px){.top h2{display:none}.top{gap:6px}.btn.sm{padding:6px 9px;font-size:13px}.pill{padding-right:9px}}
+#start .btn{justify-self:start;font-size:17px;padding-inline:32px}
+
+/* ---------- game ---------- */
+#app{height:100%;display:none;flex-direction:column;gap:10px;max-width:1100px;margin:0 auto}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-height:40px}
+.top h2{font-family:var(--serif);font-weight:900;font-size:20px;margin:0;letter-spacing:.04em;white-space:nowrap}
+.pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:3px 12px 3px 9px;font-size:13.5px;white-space:nowrap}
+.pill svg{width:16px;height:16px;color:var(--accent)}
+.top .sp{flex:1}
+.game{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px}
+.stage{--stage-bg:var(--surface);--stage-fg:var(--fg);background:var(--stage-bg);color:var(--stage-fg);border:1px solid var(--line);border-radius:10px;padding:8px;transition:background .6s,color .6s}
+.stage[data-phase="night"]{--stage-bg:var(--night);--stage-fg:var(--night-fg);border-color:transparent}
+.seats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.seat{display:flex;align-items:center;gap:8px;text-align:left;min-width:0;padding:6px 8px;border-radius:8px;border:1px solid color-mix(in srgb,var(--stage-fg) 18%,transparent);background:color-mix(in srgb,var(--stage-fg) 7%,transparent);color:inherit;min-height:52px;position:relative}
+.seat .no{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:14px;color:#fff;background:hsl(var(--h) 38% 38%)}
+.seat .tx{min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.seat .nm{font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seat .tags{display:flex;gap:4px;flex-wrap:wrap;min-height:16px}
+.tag{font-size:10.5px;padding:0 5px;border-radius:4px;line-height:16px;background:color-mix(in srgb,var(--stage-fg) 14%,transparent);white-space:nowrap}
+.tag.wolf{background:var(--wolf);color:#fff}
+.tag.good{background:var(--good);color:#fff}
+.tag.me{background:var(--accent);color:var(--accent-fg)}
+.tag.claim{outline:1px solid var(--accent);background:transparent}
+.seat.dead{opacity:.45}
+.seat.dead .nm{text-decoration:line-through}
+.seat.speaking{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 55%,transparent)}
+.seat.pick{cursor:pointer;border-color:var(--accent);animation:pulse 1.4s ease-in-out infinite}
+.seat.sel{background:var(--accent);color:var(--accent-fg);animation:none}
+.seat:not(.pick){cursor:default}
+@keyframes pulse{50%{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 45%,transparent)}}
+
+.logwrap{flex:1;min-height:0;border:1px solid var(--line);border-radius:10px;background:var(--surface);display:flex}
+.log{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth}
+.msg{animation:in .3s ease-out}
+@keyframes in{from{opacity:0;transform:translateY(6px)}}
+.say{display:flex;gap:8px;align-items:flex-start;max-width:92%}
+.say .av{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff;background:hsl(var(--h) 38% 38%);margin-top:2px}
+.say .bub{background:var(--surface2);border-radius:4px 12px 12px 12px;padding:7px 11px;min-width:0}
+.say .who{font-size:12.5px;color:var(--muted);font-weight:500}
+.say p{margin:0;overflow-wrap:anywhere}
+.say.me{align-self:flex-end;flex-direction:row-reverse}
+.say.me .bub{background:color-mix(in srgb,var(--accent) 20%,var(--surface));border-radius:12px 4px 12px 12px}
+.sys{align-self:center;text-align:center;color:var(--muted);font-size:13.5px;max-width:92%}
+.sys.strong{color:var(--fg);font-weight:700}
+.god{align-self:stretch;border:1px dashed var(--line);border-radius:8px;padding:5px 10px;font-size:13px;color:var(--muted)}
+.banner{align-self:stretch;display:flex;align-items:center;gap:12px;font-family:var(--serif);font-weight:900;font-size:18px;margin-block:6px}
+.banner::before,.banner::after{content:"";flex:1;height:1px;background:var(--line)}
+
+.panel{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:12px;display:flex;flex-direction:column;gap:10px;min-height:76px;justify-content:center}
+.panel .pt{margin:0;font-weight:700}
+.panel .hint{margin:0;color:var(--muted);font-size:13.5px}
+.panel .row{display:flex;flex-wrap:wrap;gap:8px}
+.panel .row button{border:1px solid var(--line);background:var(--surface2);border-radius:8px;padding:8px 14px;min-height:42px}
+.panel .row button.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-weight:700}
+.panel form{display:flex;gap:8px}
+.panel input[type=text]{flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:8px;padding:8px 12px;font:inherit;min-height:42px}
+
+/* overlay */
+#ov{position:fixed;inset:0;z-index:20;background:color-mix(in srgb,var(--bg) 80%,#000);display:none;align-items:center;justify-content:center;padding:16px}
+#ov .card{width:min(440px,100%);max-height:100%;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;display:grid;gap:12px}
+#ov h3{font-family:var(--serif);font-weight:900;font-size:30px;margin:0}
+#ov .role-wolf{color:var(--wolf)} #ov .role-good{color:var(--good)}
+#ov p{margin:0} #ov .muted{color:var(--muted);font-size:14px}
+#ov ul{margin:0;padding-left:20px}
+
+@media (min-width:880px){
+  body{padding-block:16px}
+  .game{display:grid;grid-template-columns:400px 1fr;grid-template-rows:auto 1fr;grid-template-areas:"stage log" "panel log";gap:12px;align-items:start}
+  .stage{grid-area:stage}
+  .panel{grid-area:panel;align-self:stretch}
+  .logwrap{grid-area:log;height:100%}
+  .seats{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .seat{flex-direction:column;align-items:flex-start;gap:4px;min-height:84px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+
+<section id="start">
+  <h1>AI 狼人殺</h1>
+  <p class="lede">你和 8 位 AI 玩家同桌。他們會自己推理、發言、投票，狼人也會說謊、假跳預言家。每位 AI 有自己的聲音和說話風格，由 Claude 即時生成發言；語音和 Claude 發言都可以在遊戲中隨時關閉。</p>
+  <div class="setup">
+    <span class="lab" id="rolelab">你的身份</span>
+    <div class="seg" id="roleseg" role="group" aria-labelledby="rolelab"></div>
+  </div>
+  <button class="btn" id="go">開始遊戲</button>
+  <dl class="rules">
+    <div><dt>9 人局</dt><dd>3 狼人、3 平民，預言家、女巫、獵人各 1。</dd></div>
+    <div><dt>狼人獲勝</dt><dd>殺光所有平民，或殺光所有神職（預言家、女巫、獵人）。</dd></div>
+    <div><dt>好人獲勝</dt><dd>放逐全部 3 名狼人。</dd></div>
+    <div><dt>放逐翻牌</dt><dd>被投票放逐的玩家會公開身份。夜晚死亡的不公開。</dd></div>
+  </dl>
+</section>
+
+<div id="app">
+  <header class="top">
+    <h2>AI 狼人殺</h2>
+    <span class="pill" id="phasepill"></span>
+    <span class="sp"></span>
+    <button class="btn ghost sm tog" id="voicebtn" aria-pressed="true">語音</button>
+    <button class="btn ghost sm tog" id="brainbtn" aria-pressed="true" title="由 Claude 即時生成 AI 玩家的發言">Claude</button>
+    <button class="btn ghost sm tog" id="speedbtn" aria-pressed="false">快轉</button>
+    <button class="btn ghost sm" id="infobtn">身份</button>
+  </header>
+  <main class="game">
+    <section class="stage" id="stage" data-phase="day"><div class="seats" id="seats"></div></section>
+    <section class="logwrap"><div class="log" id="log" aria-live="polite"></div></section>
+    <section class="panel" id="panel"></section>
+  </main>
+</div>
+<div id="ov" role="dialog" aria-modal="true"><div class="card" id="ovcard"></div></div>
+
+<script>
+// ==ENGINE START==
+const ROLE_NAME = {wolf:'狼人', villager:'平民', seer:'預言家', witch:'女巫', hunter:'獵人'};
+const GODS = ['seer','witch','hunter'];
+const NAMES = ['阿德','小琪','老王','Joyce','阿翔','小綠','大目','Amy','阿凱','小宇','莉莉','Ben'];
+const REASON = {
+  seer:'預言家已經查殺他了', vote:'他上一輪的投票方向有點怪', vague:'發言很模糊，沒給任何資訊',
+  push:'一直在帶節奏，卻說不出理由', quiet:'存在感太低，像是在躲', accusedMe:'他剛剛才針對我',
+  contra:'前後說法有對不上的地方', gut:'說不上來，就是直覺不太對', logic:'他的發言邏輯說得通'
+};
+const PERSONAS = ['話多，愛分析，常說「我覺得」','冷靜簡短，不囉嗦','急性子，愛嗆人','溫和，愛打圓場','幽默，愛開玩笑','嚴肅，像在審案','謹慎，常說「先觀察」','直覺派，講話隨性','愛吐槽，語氣有點酸'];
+let G = null, io = null;
+const rnd = n => Math.floor(Math.random()*n);
+const pick = a => a[rnd(a.length)];
+const shuffle = a => { for(let i=a.length-1;i>0;i--){ const j=rnd(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+const clamp = (x,a=0.02,b=0.98) => Math.max(a,Math.min(b,x));
+const mix = (a,b,w) => a*(1-w)+b*w;
+const seatTxt = id => `${id+1} 號`;
+function sys(t,s){ G.chat.push({sys:true,text:String(t).replace(/\n/g,' ')}); if(G.chat.length>40)G.chat.shift(); io.sys(t,s); }
+
+function newGame(humanRole, noHuman){
+  const roles = shuffle(['wolf','wolf','wolf','villager','villager','villager','seer','witch','hunter']);
+  const humanId = noHuman ? -1 : rnd(9);
+  if (humanRole && humanId>=0){
+    const k = roles.indexOf(humanRole);
+    [roles[humanId], roles[k]] = [roles[k], roles[humanId]];
+  }
+  const names = shuffle(NAMES.slice());
+  const players = roles.map((role,id)=>({
+    id, seat:id+1, name: id===humanId ? '你' : names[id], role, alive:true, human:id===humanId,
+    talk:0.4+Math.random()*0.6, bias:{}, base:{}, knownWolf:new Set(), knownGood:new Set(),
+    checks:[], claimed:null, cause:null, uses:[], persona:PERSONAS[(id*5+rnd(9))%9]
+  }));
+  shuffle(PERSONAS.slice()).forEach((x,i)=>{ if(players[i]) players[i].persona=x; });
+  players.forEach(p=>{ players.forEach(q=>{ p.base[q.id]=3/8; }); });
+  players.forEach(p=>{ if(p.role==='wolf') players.forEach(q=>{ if(q.role==='wolf'&&q.id!==p.id) p.knownWolf.add(q.id); }); });
+  G = { night:0, players, humanId, heal:true, poison:true, claimants:[], witchClaims:[], hunterClaims:[],
+        today:{accusedBy:{}}, chat:[], voteSoFar:{}, wolfVote:null, fakeSeerId:null, over:false, winner:null, voteHistory:[] };
+  return G;
+}
+
+/* ---------- beliefs ---------- */
+function claimantTrust(o, c){
+  if (o.role==='seer') return 0;
+  const cl = G.claimants.filter(x=>x.id!==o.id);
+  if (!cl.length) return 0;
+  const w = x => {
+    let v = 0.5;
+    const hit = x.results.find(r=>r.target===o.id);
+    if (hit) v = hit.wolf ? 0.03 : 0.75;
+    if (x.order===0) v += 0.05;
+    if (o.bias[x.id]===undefined) o.bias[x.id] = (Math.random()-0.5)*0.2;
+    v += o.bias[x.id];
+    const px = G.players[x.id];
+    if (!px.alive && px.cause==='wolf') v *= 2.5;
+    if (o.knownWolf.has(x.id)) return 0.01;
+    if (o.knownGood.has(x.id)) return 5;
+    return Math.max(0.01, v);
+  };
+  if (cl.length===1){ return w(cl[0])<0.1 ? 0.05 : 0.8; }
+  const tot = cl.reduce((s,x)=>s+w(x),0);
+  return w(c)/tot;
+}
+function susOf(o, j){
+  if (j===o.id) return 0;
+  if (o.knownWolf.has(j)) return 1;
+  if (o.knownGood.has(j)) return 0;
+  let s = o.base[j];
+  for (const c of G.claimants){
+    if (c.id===o.id) continue;
+    const t = claimantTrust(o,c);
+    if (c.id===j) s = mix(s, 1-t, 0.8);
+    for (const r of c.results) if (r.target===j) s = mix(s, r.wolf?0.95:0.05, t*0.85);
+  }
+  const wt = G.witchClaims.length===1 ? 0.8 : 0.4;
+  for (const w of G.witchClaims){
+    if (w.id===o.id) continue;
+    if (w.id===j) s = mix(s, 0.15, 0.5*wt);
+    if (w.saved===j) s = mix(s, 0.05, 0.7*wt);
+    if (w.poisoned===j) s = mix(s, 0.9, 0.6*wt);
+  }
+  if (G.hunterClaims.includes(j) && G.hunterClaims.length===1) s = mix(s, 0.15, 0.5);
+  return clamp(s);
+}
+function publicSus(j){
+  const obs = G.players.filter(o=>o.alive && !o.human && o.role!=='wolf' && o.id!==j);
+  if (!obs.length) return 0.375;
+  return obs.reduce((s,o)=>s+susOf(o,j),0)/obs.length;
+}
+const alivePl = () => G.players.filter(p=>p.alive);
+
+/* ---------- statements ---------- */
+function render(part, p){
+  const t = id => seatTxt(id);
+  switch(part.type){
+    case 'claimSeer': {
+      const rs = part.results.map(r=>`${r.night===G.night?'昨晚':`第 ${r.night} 晚`}驗了 ${t(r.target)}，是${r.wolf?'狼人':'好人'}`).join('；');
+      const w = part.results.filter(r=>r.wolf && G.players[r.target].alive);
+      return `我是預言家。${rs}。` + (w.length ? `今天請大家把票投給 ${t(w[0].target)}。` : '');
+    }
+    case 'accuseSeer': return `${t(part.target)} 跟我對跳預言家，他是假的。`;
+    case 'doubtSeer': return `我不太相信 ${t(part.target)} 的預言家身份，查驗給得太順了。`;
+    case 'claimWitch': {
+      const bits = [];
+      if (part.saved!=null) bits.push(`昨晚我用解藥救了 ${t(part.saved)}，他是好人`);
+      if (part.poisoned!=null) bits.push(`我毒了 ${t(part.poisoned)}`);
+      return `我是女巫。${bits.length?bits.join('，')+'。':'兩瓶藥我都還沒動。'}`;
+    }
+    case 'claimHunter': return '我是獵人。投我出局的人，我會帶走其中一個。';
+    case 'reply': return `${t(part.target)} 說我可疑，但我是好人，請大家看看他到底想帶什麼節奏。`;
+    case 'suspect': {
+      const r = part.reason ? REASON[part.reason] : '';
+      const f = [
+        ()=>`我覺得 ${t(part.target)} 比較可疑${r?'，'+r:''}。`,
+        ()=>`${t(part.target)} 我不太放心${r?'，'+r:''}。今天我傾向投他。`,
+        ()=>`先說結論：${t(part.target)} 像狼${r?'。'+r:''}。`,
+        ()=>`我會先盯 ${t(part.target)}${r?'，'+r:''}。`
+      ];
+      return pick(f)();
+    }
+    case 'defend': return `我覺得 ${t(part.target)} 不像狼，他的發言${part.reason?'邏輯說得通':'沒有明顯破綻'}。`;
+    case 'support': return `我站 ${t(part.target)} 的預言家，他有給出查驗，比較可信。`;
+    case 'selfGood': return '我是好人，沒有特殊身份。大家聽完發言再判斷。';
+    case 'pass': return '我沒有什麼資訊，先過。';
+    case 'text': return part.text;
+  }
+  return '';
+}
+function applyPart(p, part){
+  const others = G.players.filter(o=>!o.human && o.id!==p.id);
+  switch(part.type){
+    case 'claimSeer': {
+      let c = G.claimants.find(x=>x.id===p.id);
+      if (!c){ c = {id:p.id, results:[], order:G.claimants.length}; G.claimants.push(c); }
+      for (const r of part.results) if (!c.results.some(x=>x.target===r.target)) c.results.push(r);
+      p.claimed = 'seer';
+      if (p.role==='wolf') G.fakeSeerId = p.id;
+      G.players.forEach(o=>{ if (o.role==='seer' && o.id!==p.id) o.knownWolf.add(p.id); });
+      break;
+    }
+    case 'claimWitch': {
+      const ex = G.witchClaims.find(x=>x.id===p.id);
+      const rec = {id:p.id, saved:part.saved??null, poisoned:part.poisoned??null};
+      if (ex) Object.assign(ex, rec); else G.witchClaims.push(rec);
+      p.claimed = 'witch';
+      G.players.forEach(o=>{ if (o.role==='witch' && o.id!==p.id) o.knownWolf.add(p.id); });
+      break;
+    }
+    case 'claimHunter':
+      if (!G.hunterClaims.includes(p.id)) G.hunterClaims.push(p.id);
+      p.claimed = 'hunter';
+      G.players.forEach(o=>{ if (o.role==='hunter' && o.id!==p.id) o.knownWolf.add(p.id); });
+      break;
+    case 'suspect': {
+      const t = part.target;
+      (G.today.accusedBy[t] ||= []).push(p.id);
+      for (const o of others){
+        if (o.id===t) o.base[p.id] = clamp(o.base[p.id]+0.1);
+        else { const trust = 0.5 - susOf(o,p.id); o.base[t] = clamp(o.base[t]+0.03+0.08*trust); }
+      }
+      break;
+    }
+    case 'defend': {
+      const t = part.target;
+      for (const o of others){
+        if (o.id===t) continue;
+        o.base[t] = clamp(o.base[t]-0.05);
+        if (susOf(o,t)>0.6) o.base[p.id] = clamp(o.base[p.id]+0.04);
+      }
+      break;
+    }
+    case 'text': {
+      const m = /(\d)\s*號/.exec(part.text);
+      if (m){
+        const t = +m[1]-1;
+        if (t>=0 && t<9 && t!==p.id){
+          if (/不是狼|好人|不像|相信|站|信/.test(part.text) && !/不信|不相信/.test(part.text)) applyPart(p,{type:'defend',target:t});
+          else if (/狼|可疑|懷疑|投|出局|不信|不相信|不對/.test(part.text)) applyPart(p,{type:'suspect',target:t,reason:'gut'});
+        }
+      }
+      break;
+    }
+  }
+}
+async function deliver(p, parts){
+  let text = parts.map(x=>render(x,p)).join(' ');
+  if (!p.human && io.polish){ try { text = (await io.polish(p, text, parts)) || text; } catch(e){} }
+  G.chat.push({seat:p.seat, name:p.human?'你':p.name, text}); if(G.chat.length>40)G.chat.shift();
+  await io.say(p, text);
+  parts.forEach(x=>applyPart(p,x));
+  return text;
+}
+
+/* ---------- AI decisions ---------- */
+function chooseSuspect(p){
+  const cands = G.players.filter(x=>x.alive && x.id!==p.id);
+  if (!cands.length) return null;
+  const accusedMe = id => (G.today.accusedBy[p.id]||[]).includes(id);
+  if (p.role==='wolf'){
+    let tgt;
+    if (Math.random()<0.6){
+      if (G.wolfVote==null || !G.players[G.wolfVote].alive) G.wolfVote = chooseWolfVote();
+      tgt = G.players[G.wolfVote];
+    }
+    if (!tgt || tgt.id===p.id){
+      const goods = cands.filter(x=>x.role!=='wolf');
+      tgt = goods.map(x=>[x, publicSus(x.id)+Math.random()*0.2]).sort((a,b)=>b[1]-a[1])[0]?.[0] || cands[0];
+    }
+    const reason = accusedMe(tgt.id) ? 'accusedMe' : pick(['vote','vague','push','quiet','contra','gut']);
+    return {type:'suspect', target:tgt.id, reason};
+  }
+  const best = cands.map(x=>[x, susOf(p,x.id)+Math.random()*0.12]).sort((a,b)=>b[1]-a[1])[0][0];
+  let reason;
+  if (G.claimants.some(c=>c.id!==p.id && claimantTrust(p,c)>0.55 && c.results.some(r=>r.target===best.id && r.wolf))) reason='seer';
+  else if (accusedMe(best.id)) reason='accusedMe';
+  else reason = pick(['vote','vague','push','quiet','contra','gut']);
+  return {type:'suspect', target:best.id, reason};
+}
+function chooseWolfVote(){
+  const al = alivePl();
+  const seerC = G.claimants.map(c=>G.players[c.id]).find(x=>x.alive && x.role!=='wolf');
+  if (seerC && Math.random()<0.35) return seerC.id;
+  const s = al.map(x=>[x, x.role==='wolf' ? publicSus(x.id)-0.55 : publicSus(x.id)+Math.random()*0.1]).sort((a,b)=>b[1]-a[1]);
+  return s[0][0].id;
+}
+function aiSpeak(p, ctx={}){
+  const parts = [];
+  const accusers = (G.today.accusedBy[p.id]||[]).filter(id=>G.players[id].alive);
+  const myClaim = G.claimants.find(c=>c.id===p.id);
+  const others = G.claimants.filter(c=>c.id!==p.id);
+  const live = G.players.filter(x=>x.alive && x.id!==p.id);
+
+  if (p.role==='seer'){
+    const fresh = p.checks.filter(ch=>!(myClaim && myClaim.results.some(r=>r.target===ch.target)));
+    let claim = false;
+    if (myClaim) claim = fresh.length>0;
+    else if (p.checks.length) claim = p.checks.some(c=>c.wolf) || others.length>0 || ctx.lastWords || G.night>=2 || Math.random()<0.65;
+    if (claim && fresh.length){
+      parts.push({type:'claimSeer', results:fresh.map(c=>({night:c.night,target:c.target,wolf:c.wolf}))});
+      if (others.length) parts.push({type:'accuseSeer', target:others[0].id});
+    }
+  } else if (p.role==='wolf'){
+    const realSeer = others.find(c=>G.players[c.id].role!=='wolf');
+    const fakeExists = G.claimants.some(c=>G.players[c.id].role==='wolf');
+    if (G.fakeSeerId===p.id){
+      const done = new Set((myClaim?.results||[]).map(r=>r.target));
+      const goods = live.filter(x=>x.role!=='wolf' && !done.has(x.id));
+      if (goods.length && !(myClaim.results.some(r=>r.night===G.night))){
+        const tg = (realSeer && G.players[realSeer.id].alive && !done.has(realSeer.id) && Math.random()<0.5) ? G.players[realSeer.id] : pick(goods);
+        parts.push({type:'claimSeer', results:[{night:G.night,target:tg.id,wolf:true}]});
+      }
+    } else if (!fakeExists && G.night<=2 && !ctx.lastWords && !G.fakeTried && Math.random()<(realSeer?0.5:0.3)){
+      G.fakeTried = true;
+      const goods = live.filter(x=>x.role!=='wolf');
+      let res;
+      const mates = live.filter(x=>x.role==='wolf');
+      if (!realSeer && mates.length && Math.random()<0.25) res = {night:G.night,target:pick(mates).id,wolf:false};
+      else {
+        const tg = (realSeer && G.players[realSeer.id].alive && Math.random()<0.5) ? G.players[realSeer.id] : pick(goods);
+        res = {night:G.night,target:tg.id,wolf:true};
+      }
+      parts.push({type:'claimSeer', results:[res]});
+    } else if (realSeer && Math.random()<0.6){
+      parts.push({type:'doubtSeer', target:realSeer.id});
+    }
+  } else {
+    if (p.role==='witch'){
+      const last = p.uses[p.uses.length-1];
+      if (last && (last.saved!=null||last.poisoned!=null) && (p.claimed!=='witch' || last.night===G.night)){
+        if (Math.random()<0.45 || accusers.length || ctx.lastWords){
+          parts.push({type:'claimWitch', saved:last.saved, poisoned:last.poisoned});
+        }
+      }
+    }
+    if (p.role==='hunter' && !p.claimed && (accusers.length && Math.random()<0.6 || Math.random()<0.08)){
+      parts.push({type:'claimHunter'});
+    }
+    const trusted = G.claimants.filter(c=>c.id!==p.id && claimantTrust(p,c)>0.65 && G.players[c.id].role!=='wolf' || (c.id!==p.id && claimantTrust(p,c)>0.65));
+    if (trusted.length && Math.random()<0.55) parts.push({type:'support', target:trusted[0].id});
+  }
+
+  if (accusers.length && Math.random()<0.8 && !parts.some(x=>x.type==='claimSeer')) parts.push({type:'reply', target:accusers[0]});
+
+  if (p.role==='wolf'){
+    const mate = live.find(x=>x.role==='wolf' && (G.today.accusedBy[x.id]||[]).length>=2);
+    if (mate && Math.random()<0.4) parts.push({type:'defend', target:mate.id, reason:'logic'});
+  } else if (p.role!=='seer'){
+    const clear = live.find(x=>susOf(p,x.id)<0.12 && x.id!==p.id && p.talk>0.75 && Math.random()<0.4);
+    if (clear && parts.length<2) parts.push({type:'defend', target:clear.id, reason:'logic'});
+  }
+
+  const hasClaimOnly = parts.length && parts.every(x=>['claimSeer','accuseSeer','claimWitch','claimHunter'].includes(x.type));
+  if (parts.length<3 && (!parts.some(x=>x.type==='claimSeer') || Math.random()<0.4) && (parts.length===0 || !hasClaimOnly || Math.random()<0.6)){
+    const s = chooseSuspect(p);
+    if (s && !parts.some(x=>x.type==='suspect'||x.type==='doubtSeer')) parts.push(s);
+  }
+  if (!parts.length) parts.push(Math.random()<0.5 ? {type:'selfGood'} : {type:'pass'});
+  return parts.slice(0,3);
+}
+function aiVote(p){
+  const cands = G.players.filter(x=>x.alive && x.id!==p.id);
+  if (p.role==='wolf'){
+    if (G.wolfVote==null || !G.players[G.wolfVote].alive) G.wolfVote = chooseWolfVote();
+    const hv = G.humanId>=0 ? (G.voteSoFar||{})[G.humanId] : undefined;
+    if (hv!=null && hv!==p.id && G.players[hv].role!=='wolf' && G.players[hv].alive && Math.random()<0.4) return hv;
+    if (G.wolfVote!==p.id) return G.wolfVote;
+    return pick(cands.filter(x=>x.role!=='wolf')).id;
+  }
+  const acc = id => (G.today.accusedBy[id]||[]).length;
+  const sofar = G.voteSoFar||{};
+  const got = id => Object.values(sofar).filter(t=>t===id).length;
+  const hv = G.humanId>=0 ? sofar[G.humanId] : undefined;
+  return cands.map(x=>[x, susOf(p,x.id)+0.16*acc(x.id)+0.05*got(x.id)+((hv===x.id && susOf(p,G.humanId)<0.5)?0.12:0)+Math.random()*0.08]).sort((a,b)=>b[1]-a[1])[0][0].id;
+}
+function aiWolfTarget(){
+  const goods = G.players.filter(x=>x.alive && x.role!=='wolf');
+  const seerC = G.claimants.map(c=>G.players[c.id]).find(x=>x.alive && x.role!=='wolf');
+  if (seerC && Math.random()<0.5) return seerC.id;
+  const wc = G.witchClaims.map(w=>G.players[w.id]).find(x=>x.alive && x.role!=='wolf');
+  if (wc && Math.random()<0.3) return wc.id;
+  const hc = G.hunterClaims.map(i=>G.players[i]).find(x=>x.alive && x.role!=='wolf');
+  const pool = goods.filter(x=>!hc || x.id!==hc.id);
+  return pick(pool.length?pool:goods).id;
+}
+function aiSeerTarget(p){
+  let c = G.players.filter(x=>x.alive && x.id!==p.id && !p.checks.some(k=>k.target===x.id));
+  if (!c.length) c = G.players.filter(x=>x.alive && x.id!==p.id);
+  return c.map(x=>[x, susOf(p,x.id)+Math.random()*0.25]).sort((a,b)=>b[1]-a[1])[0][0].id;
+}
+
+/* ---------- human speech ---------- */
+async function humanSpeech(lastWords){
+  const me = G.players[G.humanId];
+  const myClaim = G.claimants.find(c=>c.id===me.id);
+  for(;;){
+    const opts = [{label:'我是好人', value:'selfGood'},{label:'懷疑某人', value:'suspect'},{label:'相信某人', value:'defend'}];
+    if (me.role==='seer') opts.push({label: myClaim?'報告查驗結果':'跳預言家', value:'claimSeer'});
+    if (me.role==='wolf') opts.push({label:'假跳預言家', value:'fakeSeer'});
+    if (me.role==='witch') opts.push({label:'跳女巫', value:'claimWitch'});
+    if (me.role==='hunter') opts.push({label:'亮獵人身份', value:'claimHunter'});
+    opts.push({label:'過', value:'pass'});
+    const r = await io.ask({type:'speech', text: lastWords?'你的遺言':'輪到你發言', options:opts});
+    if (r.text) return [{type:'text', text:r.text}];
+    const others = alivePl().filter(x=>x.id!==me.id).map(x=>x.id);
+    switch(r.value){
+      case 'pass': return [{type:'pass'}];
+      case 'selfGood': return [{type:'selfGood'}];
+      case 'suspect': case 'defend': {
+        const t = await io.ask({type:'target', text: r.value==='suspect'?'你懷疑誰？':'你相信誰？', targets:others, allowSkip:true, skipLabel:'返回'});
+        if (t==null) continue;
+        return [{type:r.value, target:t, reason: r.value==='suspect'?'gut':'logic'}];
+      }
+      case 'claimSeer': {
+        const fresh = me.checks.filter(ch=>!(myClaim && myClaim.results.some(x=>x.target===ch.target)));
+        const list = (myClaim ? fresh : me.checks);
+        if (!list.length){ await io.ask({type:'info', text:'目前沒有新的查驗結果可以報告。', button:'返回'}); continue; }
+        return [{type:'claimSeer', results:list.map(c=>({night:c.night,target:c.target,wolf:c.wolf}))}];
+      }
+      case 'fakeSeer': {
+        const t = await io.ask({type:'target', text:'假跳預言家：你要報誰的查驗？', targets:others, allowSkip:true, skipLabel:'返回'});
+        if (t==null) continue;
+        const w = await io.ask({type:'choice', text:`${seatTxt(t)} 的結果是？`, options:[{label:'狼人（查殺）',value:true},{label:'好人（金水）',value:false}]});
+        return [{type:'claimSeer', results:[{night:G.night,target:t,wolf:w}]}];
+      }
+      case 'claimWitch': {
+        const u = [...me.uses].reverse().find(x=>x.saved!=null||x.poisoned!=null);
+        return [{type:'claimWitch', saved:u?.saved??null, poisoned:u?.poisoned??null}];
+      }
+      case 'claimHunter': return [{type:'claimHunter'}];
+    }
+  }
+}
+
+/* ---------- flow ---------- */
+function checkWin(){
+  const al = alivePl();
+  const w = al.filter(p=>p.role==='wolf').length;
+  const vil = al.filter(p=>p.role==='villager').length;
+  const gods = al.filter(p=>GODS.includes(p.role)).length;
+  if (w===0) G.winner='good';
+  else if (vil===0 || gods===0) G.winner='wolf';
+  G.over = !!G.winner;
+  return G.over;
+}
+
+async function nightPhase(){
+  const P = G.players;
+  const alive = alivePl();
+  const wolves = alive.filter(x=>x.role==='wolf');
+  const hw = wolves.find(x=>x.human);
+  const suggest = aiWolfTarget();
+  let wolfTarget;
+  if (hw){
+    const mates = P.filter(x=>x.role==='wolf' && x.id!==hw.id).map(x=>seatTxt(x.id)+(x.alive?'':'（已出局）')).join('、');
+    wolfTarget = await io.ask({type:'target', text:`狼人請睜眼。同伴：${mates}。同伴建議殺 ${seatTxt(suggest)}。今晚殺誰？`, targets:alive.filter(x=>x.role!=='wolf').map(x=>x.id)});
+  } else { wolfTarget = suggest; await io.sleep(900); }
+  io.god(`狼人選擇殺害 ${seatTxt(wolfTarget)}。`);
+
+  const seer = alive.find(x=>x.role==='seer');
+  if (seer){
+    let tgt;
+    if (seer.human) tgt = await io.ask({type:'target', text:'預言家請睜眼。今晚要查驗誰？', targets:alive.filter(x=>x.id!==seer.id).map(x=>x.id)});
+    else { tgt = aiSeerTarget(seer); await io.sleep(700); }
+    const wolf = P[tgt].role==='wolf';
+    seer.checks.push({night:G.night,target:tgt,wolf});
+    (wolf?seer.knownWolf:seer.knownGood).add(tgt);
+    if (seer.human) await io.ask({type:'info', text:`${seatTxt(tgt)} 是「${wolf?'狼人':'好人'}」。`, button:'閉眼'});
+    io.god(`預言家查驗 ${seatTxt(tgt)}：${wolf?'狼人':'好人'}。`);
+  }
+
+  const witch = alive.find(x=>x.role==='witch');
+  let saved = null, poisoned = null;
+  if (witch){
+    if (witch.human){
+      if (G.heal && wolfTarget!=null){
+        const use = await io.ask({type:'choice', text:`女巫請睜眼。今晚 ${seatTxt(wolfTarget)} 被狼人殺害。要使用解藥嗎？`, options:[{label:'使用解藥',value:true},{label:'不使用',value:false}]});
+        if (use){ saved = wolfTarget; G.heal = false; }
+      } else if (!G.heal){
+        await io.ask({type:'info', text:'女巫請睜眼。你的解藥已經用完，不會得知今晚的受害者。', button:'繼續'});
+      }
+      if (saved==null && G.poison){
+        const t = await io.ask({type:'target', text:'要使用毒藥嗎？選擇目標，或跳過。', targets:alive.filter(x=>x.id!==witch.id).map(x=>x.id), allowSkip:true, skipLabel:'不使用毒藥'});
+        if (t!=null){ poisoned = t; G.poison = false; }
+      }
+    } else {
+      await io.sleep(800);
+      if (G.heal && wolfTarget!=null && (G.night===1 || Math.random()<0.65)){ saved = wolfTarget; G.heal = false; }
+      if (saved==null && G.poison && G.night>=2){
+        const cand = alive.filter(x=>x.id!==witch.id).map(x=>[x,susOf(witch,x.id)]).sort((a,b)=>b[1]-a[1])[0];
+        if (cand && cand[1]>0.62 && Math.random()<0.85){ poisoned = cand[0].id; G.poison = false; }
+      }
+    }
+    witch.uses.push({night:G.night, saved, poisoned});
+    if (saved!=null) witch.knownGood.add(saved);
+    io.god(`女巫${saved!=null?`用解藥救了 ${seatTxt(saved)}`:''}${poisoned!=null?`毒殺了 ${seatTxt(poisoned)}`:''}${saved==null&&poisoned==null?'沒有用藥':''}。`);
+  }
+
+  const others = alive.filter(x=>!['wolf','seer','witch'].includes(x.role) && x.human);
+  if (others.length) await io.ask({type:'info', text:'天黑了，請閉上眼睛。', button:'閉眼'});
+
+  const deaths = [];
+  if (wolfTarget!=null && saved!==wolfTarget) deaths.push({id:wolfTarget,cause:'wolf'});
+  if (poisoned!=null && !deaths.some(d=>d.id===poisoned)) deaths.push({id:poisoned,cause:'poison'});
+  return deaths;
+}
+
+async function lastWords(p){
+  sys(`${seatTxt(p.id)}${p.human?'（你）':' '+p.name} 的遺言`);
+  io.speaking(p.id);
+  let parts;
+  if (p.human) parts = await humanSpeech(true);
+  else { await io.sleep(600); parts = aiSpeak(p,{lastWords:true}); }
+  const text = await deliver(p, parts);
+  await io.pause(text);
+  io.speaking(null);
+}
+async function hunterShoot(h){
+  let t;
+  const cands = alivePl().filter(x=>x.id!==h.id);
+  if (!cands.length) return;
+  if (h.human) t = await io.ask({type:'target', text:'你是獵人，請開槍帶走一名玩家。', targets:cands.map(x=>x.id)});
+  else { await io.sleep(700); t = cands.map(x=>[x,susOf(h,x.id)+Math.random()*0.1]).sort((a,b)=>b[1]-a[1])[0][0].id; }
+  sys(`${seatTxt(h.id)}是獵人，開槍帶走了 ${seatTxt(t)}。`, true);
+  const v = G.players[t]; v.alive=false; v.cause='shot';
+  h.claimed = 'hunter';
+  io.update();
+}
+async function processDeaths(deaths, mode){
+  if (!deaths.length){ if(mode==='night') sys('昨晚是平安夜，沒有人死亡。', true); return; }
+  deaths.forEach(d=>{ const p=G.players[d.id]; p.alive=false; p.cause=d.cause; });
+  io.update();
+  if (mode==='night') sys('昨晚死亡的是：' + deaths.map(d=>seatTxt(d.id)).join('、') + '。', true);
+  else {
+    const ex = G.players[deaths[0].id];
+    sys(`${seatTxt(ex.id)} 被放逐出局，身份是「${ROLE_NAME[ex.role]}」。`, true);
+    G.players.forEach(o=>{ if(!o.human && o.id!==ex.id){ (ex.role==='wolf'?o.knownWolf:o.knownGood).add(ex.id);
+      (G.voteHistory[G.voteHistory.length-1]||{}); const vs=G.voteHistory[G.voteHistory.length-1]||{};
+      for (const [v,t] of Object.entries(vs)) if (+t===ex.id && +v!==o.id){ o.base[+v] = clamp(o.base[+v] + (ex.role==='wolf'?-0.12:0.15)); } } });
+  }
+  await io.sleep(900);
+  if (checkWin()) return;
+  const dead = deaths.map(d=>G.players[d.id]);
+  if (mode==='exile' || G.night===1) for (const p of dead) await lastWords(p);
+  for (const p of dead) if (p.role==='hunter' && p.cause!=='poison') { await hunterShoot(p); }
+  checkWin();
+}
+async function discussion(){
+  G.today = {accusedBy:{}}; G.wolfVote = null;
+  const ids = alivePl().map(p=>p.id);
+  const start = (G.night*2) % 9;
+  const order = shuffle([]).concat(G.players.map((_,i)=>(start+i)%9).filter(i=>ids.includes(i)));
+  sys('白天討論開始，依座位順序發言。');
+  for (const id of order){
+    const p = G.players[id];
+    if (!p.alive) continue;
+    io.speaking(id);
+    let parts;
+    if (p.human) parts = await humanSpeech(false);
+    else { await io.sleep(500); parts = aiSpeak(p); }
+    const text = await deliver(p, parts);
+    await io.pause(text);
+  }
+  io.speaking(null);
+}
+async function votePhase(){
+  sys('發言結束，進入投票。你先表態，其他人依座位順序跟進。', true);
+  const votes = {};
+  G.voteSoFar = {};
+  const voters = alivePl();
+  const say = async (p,t)=>{ votes[p.id]=t; G.voteSoFar[p.id]=t; await io.say(p, t==null ? '我棄票。' : pick([`我投 ${seatTxt(t)}。`,`這票給 ${seatTxt(t)}。`,`${seatTxt(t)}，我投你。`,`我選 ${seatTxt(t)}。`])); await io.pause('我投 5 號。'); };
+  const hv = voters.find(p=>p.human);
+  if (hv){
+    const t = await io.ask({type:'target', text:'投票：你先表態，要放逐誰？', targets:voters.filter(x=>x.id!==hv.id).map(x=>x.id), allowSkip:true, skipLabel:'棄票'});
+    await say(hv, t);
+    if (t==null) delete votes[hv.id];
+  }
+  for (const p of voters) if (!p.human){ io.speaking(p.id); const t = aiVote(p); await say(p, t); }
+  io.speaking(null);
+  await io.sleep(500);
+  const cnt = {};
+  for (const [v,t] of Object.entries(votes)) (cnt[t] ||= []).push(+v);
+  const lines = Object.entries(cnt).sort((a,b)=>b[1].length-a[1].length).map(([t,vs])=>`${seatTxt(+t)} ← ${vs.map(v=>seatTxt(v)).join('、')}（${vs.length} 票）`);
+  sys('投票結果：\n'+(lines.join('\n')||'全部棄票'));
+  for (const o of G.players.filter(x=>!x.human)){
+    for (const [v,t] of Object.entries(votes)){
+      const vv=+v, tt=+t;
+      if (vv===o.id) continue;
+      if (tt===o.id) o.base[vv]=clamp(o.base[vv]+0.08);
+      else { const s = susOf(o,tt); if (s<0.15) o.base[vv]=clamp(o.base[vv]+0.12); else if (s>0.85) o.base[vv]=clamp(o.base[vv]-0.08); }
+    }
+  }
+  G.voteHistory.push(votes);
+  const max = Math.max(0,...Object.values(cnt).map(a=>a.length));
+  const top = Object.entries(cnt).filter(([,a])=>a.length===max);
+  await io.sleep(700);
+  if (!max || top.length!==1){ sys('平票，今天沒有人被放逐。', true); return; }
+  await processDeaths([{id:+top[0][0],cause:'exile'}], 'exile');
+}
+async function playGame(){
+  while(!G.over && G.night<25){
+    G.night++;
+    await io.phase('night', G.night);
+    const deaths = await nightPhase();
+    await io.phase('day', G.night);
+    await processDeaths(deaths,'night');
+    if (G.over) break;
+    await discussion();
+    await votePhase();
+  }
+  if (!G.over) { G.winner = 'wolf'; G.over = true; }
+  await io.end(G.winner);
+}
+// ==ENGINE END==
+
+/* ================= UI ================= */
+if (typeof document !== 'undefined') (function(){
+  const $ = s => document.querySelector(s);
+  let speed = 1, selectable = null, selected = null, speakingId = null, phase = 'day';
+  const logEl = $('#log'), panel = $('#panel'), seatsEl = $('#seats');
+  const hue = id => (id*40+15)%360;
+  const sunSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>';
+  const moonSvg = '<svg viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" fill="currentColor"/></svg>';
+
+  /* start screen */
+  let chosenRole = null;
+  const roleOpts = [[null,'隨機'],['wolf','狼人'],['seer','預言家'],['witch','女巫'],['hunter','獵人'],['villager','平民']];
+  const seg = $('#roleseg');
+  roleOpts.forEach(([v,l])=>{
+    const b = document.createElement('button'); b.type='button'; b.textContent=l; b.id='role-'+(v||'random');
+    b.setAttribute('aria-pressed', v===chosenRole ? 'true':'false');
+    b.onclick = ()=>{ chosenRole=v; [...seg.children].forEach(c=>c.setAttribute('aria-pressed','false')); b.setAttribute('aria-pressed','true'); };
+    seg.appendChild(b);
+  });
+  $('#go').onclick = async ()=>{
+    const goBtn = $('#go'); goBtn.disabled = true; goBtn.textContent = '連線中…';
+    await initBrain();
+    goBtn.disabled = false; goBtn.textContent = '開始遊戲';
+    newGame(chosenRole, false);
+    $('#start').style.display='none'; $('#app').style.display='flex';
+    logEl.innerHTML=''; renderSeats(); panelIdle('準備開始…');
+    showInfo(true).then(()=>playGame());
+  };
+  $('#speedbtn').onclick = e=>{ speed = speed===1 ? 0.25 : 1; e.currentTarget.setAttribute('aria-pressed', speed!==1); if (speed!==1) cancelSpeech(); };
+
+  /* voice */
+  const synth = ('speechSynthesis' in window) ? window.speechSynthesis : null;
+  let voiceOn = !!synth, voices = [];
+  const PITCH = [1,0.8,1.25,0.9,1.15,0.7,1.35,1.05,0.85], RATE = [1,1.1,0.95,1.05,1,1.12,0.97,1.08,1.02];
+  function loadVoices(){ if(!synth) return; const all = synth.getVoices(); voices = all.filter(v=>/^zh[-_](TW|HK)/i.test(v.lang)); if(!voices.length) voices = all.filter(v=>/^zh/i.test(v.lang)); }
+  if (synth){ loadVoices(); synth.onvoiceschanged = loadVoices; } else $('#voicebtn').hidden = true;
+  function cancelSpeech(){ try{ synth && synth.cancel(); }catch(e){} }
+  $('#voicebtn').onclick = e=>{ voiceOn = !voiceOn; e.currentTarget.setAttribute('aria-pressed', voiceOn); if(!voiceOn) cancelSpeech(); };
+  let lastSpoke = false;
+  function speak(text, id){
+    return new Promise(res=>{
+      if (!voiceOn || !synth || speed!==1){ res(false); return; }
+      try{
+        const u = new SpeechSynthesisUtterance(text); u.lang = 'zh-TW';
+        if (voices.length) u.voice = voices[id % voices.length];
+        u.pitch = PITCH[id%9]; u.rate = RATE[id%9];
+        let done = false; const fin = ok=>{ if(!done){ done=true; clearTimeout(t); res(ok); } };
+        const t = setTimeout(()=>{ cancelSpeech(); fin(false); }, 3000+text.length*420);
+        u.onend = ()=>fin(true); u.onerror = ()=>fin(false);
+        synth.speak(u);
+      }catch(e){ res(false); }
+    });
+  }
+
+  /* Claude as the players' voice */
+  let brain = null, brainOn = false;
+  function brainBtn(){ const b=$('#brainbtn'); b.setAttribute('aria-pressed', brainOn); b.disabled = !brain; b.textContent = brain ? 'Claude' : '內建'; }
+  async function initBrain(){
+    try{
+      if (!brain && window.claude && window.claude.use) brain = await window.claude.use('sample');
+      if (brain){ await brain('只回覆「好」。', {modelTier:'quick', cache:{gcTime:600000}}); brainOn = true; }
+    }catch(e){ brain = null; brainOn = false; }
+    brainBtn();
+  }
+  $('#brainbtn').onclick = ()=>{ if(!brain) return; brainOn = !brainOn; brainBtn(); };
+  const BRAIN_FATAL = ['not_granted','sampling_disabled','not_declared','capability_disabled','capability_removed','rate_limited'];
+  async function polish(p, text, parts){
+    if (!brainOn || !brain) return text;
+    const ctx = G.chat.slice(-12).map(c=>c.sys ? `【${c.text}】` : `${c.seat} 號${c.name}：${c.text}`).join('\n') || '（還沒有人發言）';
+    const alive = G.players.filter(x=>x.alive).map(x=>`${x.seat} 號${x.human?'(真人玩家，叫「你」)':x.name}`).join('、');
+    const mates = G.players.filter(x=>x.role==='wolf' && x.id!==p.id).map(x=>`${x.seat} 號`).join('、');
+    const secret = p.role==='wolf' ? `你是狼人，隊友是 ${mates}。你要偽裝成好人，不能自爆身份，也不能提到「狼隊友」。` : `你是${ROLE_NAME[p.role]}。除非下面「要表達的內容」本身要你亮身份，否則不要透露自己的身份。`;
+    const prompt = `你在玩 9 人狼人殺（3 狼人、3 平民、預言家、女巫、獵人），現在是第 ${G.night} 天。你扮演 ${p.seat} 號「${p.name}」。${secret}\n個性：${p.persona}。\n存活玩家：${alive}。\n\n最近的對話：\n${ctx}\n\n要表達的內容（事實必須原樣保留：座位號碼、身份宣告、查驗結果、投票對象都不能改）：\n${text}\n\n請用台灣口語的繁體中文，把它改寫成你自己會說的話，1 到 3 句，全部不超過 70 字。座位一律寫成「N 號」（阿拉伯數字）。如果最近有人點名你或說了跟你有關的話，可以簡短回應。不要加引號、旁白或自己的名字，只輸出發言內容。`;
+    const ctl = new AbortController(); const timer = setTimeout(()=>ctl.abort(), 9000);
+    try{
+      const r = await brain(prompt, {modelTier:'quick', cache:false, signal:ctl.signal});
+      let out = (r.text||'').trim().replace(/^[「"“']+|[」"”']+$/g,'').replace(/^\d\s*號[^：:]{0,6}[：:]/,'').trim();
+      if (!out || out.length>110 || r.truncated) return text;
+      const need = [...text.matchAll(/(\d)\s*號/g)].map(m=>m[1]);
+      if (need.some(d=>!new RegExp(d+'\\s*號').test(out))) return text;
+      const known = text + ctx;
+      if (['預言家','女巫','獵人'].some(w=>out.includes(w) && !known.includes(w))) return text;
+      if (/我是狼|我們狼|隊友/.test(out) && p.role==='wolf') return text;
+      return out;
+    }catch(e){
+      if (e && BRAIN_FATAL.includes(e.code)){ brainOn = false; brainBtn(); }
+      return text;
+    }finally{ clearTimeout(timer); }
+  }
+  $('#infobtn').onclick = ()=>showInfo(false);
+
+  /* overlay */
+  function roleInfo(me){
+    const wolfMates = G.players.filter(p=>p.role==='wolf' && p.id!==me.id).map(p=>seatTxt(p.id)).join('、');
+    const d = {
+      wolf:`每晚和同伴選一名玩家殺害。白天要藏好身份，也可以假跳預言家，把水攪渾。<br>你的同伴：${wolfMates}。`,
+      villager:'沒有技能。靠聽發言、看投票，找出藏在桌上的狼人。',
+      seer:'每晚可以查驗一名玩家是狼人還是好人。要不要跳身份、什麼時候跳，由你決定。',
+      witch:'一瓶解藥、一瓶毒藥，各用一次，同一晚只能用一瓶。你會知道每晚的受害者。',
+      hunter:'被狼人殺害或被放逐時，可以開槍帶走一人。被毒殺不能開槍。'
+    }[me.role];
+    let extra = '';
+    if (me.role==='seer' && me.checks.length) extra = '<p class="muted">查驗紀錄</p><ul>'+me.checks.map(c=>`<li>第 ${c.night} 晚：${seatTxt(c.target)} 是${c.wolf?'狼人':'好人'}</li>`).join('')+'</ul>';
+    if (me.role==='witch') extra = `<p class="muted">解藥：${G.heal?'還在':'已用'}　毒藥：${G.poison?'還在':'已用'}</p>`;
+    return `<h3 class="serif ${me.role==='wolf'?'role-wolf':'role-good'}">${ROLE_NAME[me.role]}</h3><p>${d}</p>${extra}`;
+  }
+  function showInfo(first){
+    return new Promise(res=>{
+      const me = G.players[G.humanId];
+      const ov = $('#ov');
+      $('#ovcard').innerHTML = `<p class="muted">${first?'你的身份':'我的身份'}　座位 ${me.seat} 號</p>${roleInfo(me)}<button class="btn" id="ovok">${first?'開始':'關閉'}</button>`;
+      ov.style.display='flex';
+      $('#ovok').focus();
+      $('#ovok').onclick = ()=>{ ov.style.display='none'; res(); };
+    });
+  }
+
+  /* seats */
+  function renderSeats(){
+    const me = G.players[G.humanId];
+    const god = !me.alive || G.over;
+    seatsEl.innerHTML = '';
+    G.players.forEach(p=>{
+      const b = document.createElement('button'); b.type='button';
+      b.className = 'seat'+(p.alive?'':' dead')+(speakingId===p.id?' speaking':'')+(selectable&&selectable.includes(p.id)?' pick':'')+(selected===p.id?' sel':'');
+      b.style.setProperty('--h', hue(p.id));
+      const tags = [];
+      if (p.human) tags.push(['你','me']);
+      if (!p.alive) tags.push(['出局','']);
+      if (god) tags.push([ROLE_NAME[p.role], p.role==='wolf'?'wolf':'']);
+      else if (me.role==='wolf' && p.role==='wolf' && !p.human) tags.push(['狼人同伴','wolf']);
+      if (me.role==='seer' && !p.human){ if (me.knownWolf.has(p.id) && p.role==='wolf') tags.push(['查殺','wolf']); else if (me.knownGood.has(p.id)) tags.push(['金水','good']); }
+      if (p.claimed && !(god)) tags.push(['跳'+ROLE_NAME[p.claimed],'claim']);
+      b.innerHTML = `<span class="no">${p.seat}</span><span class="tx"><span class="nm"></span><span class="tags">${tags.map(([t,c])=>`<span class="tag ${c}">${t}</span>`).join('')}</span></span>`;
+      b.querySelector('.nm').textContent = p.name;
+      b.setAttribute('aria-label', `${p.seat}號 ${p.name}${p.alive?'':' 已出局'}`);
+      if (selectable && selectable.includes(p.id)) b.onclick = ()=>selectCb && selectCb(p.id);
+      else b.tabIndex = -1;
+      seatsEl.appendChild(b);
+    });
+  }
+  let selectCb = null;
+
+  /* log */
+  function scrollLog(){ logEl.scrollTop = logEl.scrollHeight; }
+  function addEl(el){ logEl.appendChild(el); scrollLog(); }
+  function sleep(ms){ return new Promise(r=>setTimeout(r, Math.max(30, ms*speed))); }
+
+  io = {
+    sleep,
+    async say(p, text){
+      const el = document.createElement('div'); el.className = 'msg say'+(p.human?' me':'');
+      el.innerHTML = '<span class="av"></span><div class="bub"><div class="who"></div><p></p></div>';
+      el.querySelector('.av').textContent = p.seat; el.querySelector('.av').style.setProperty('--h', hue(p.id));
+      el.querySelector('.who').textContent = p.human ? '你' : p.name;
+      el.querySelector('p').textContent = text;
+      addEl(el);
+      lastSpoke = p.human ? false : await speak(text, p.id);
+    },
+    polish,
+    pause(text){ return lastSpoke ? sleep(250) : sleep(500+text.length*28); },
+    sys(text, strong){
+      const el = document.createElement('div'); el.className='msg sys'+(strong?' strong':'');
+      el.style.whiteSpace='pre-line'; el.textContent=text; addEl(el);
+    },
+    god(text){
+      const me = G.players[G.humanId];
+      if (me.alive) return;
+      const el = document.createElement('div'); el.className='msg god'; el.textContent='觀戰　'+text; addEl(el);
+    },
+    update: renderSeats,
+    speaking(id){ speakingId = id; renderSeats(); if (id!=null && !G.players[id].human) panelIdle(`${seatTxt(id)} ${G.players[id].name} ${brainOn?'思考並發言中…':'發言中…'}`); },
+    async phase(name, n){
+      phase = name; $('#stage').dataset.phase = name;
+      $('#phasepill').innerHTML = (name==='night'?moonSvg:sunSvg) + `<span>第 ${n} ${name==='night'?'夜':'天'}</span>`;
+      const b = document.createElement('div'); b.className='msg banner';
+      b.textContent = name==='night' ? `第 ${n} 夜　天黑請閉眼` : `第 ${n} 天　天亮了`; addEl(b);
+      panelIdle(name==='night' ? '夜晚進行中…' : '天亮了…');
+      const me = G.players[G.humanId];
+      if (name==='night' && !me.alive) io.god('夜晚開始，你可以看到所有人的行動。');
+      await sleep(900);
+    },
+    async end(winner){
+      speakingId = null; renderSeats();
+      const me = G.players[G.humanId];
+      const win = (winner==='wolf') === (me.role==='wolf');
+      const b = document.createElement('div'); b.className='msg banner';
+      b.textContent = winner==='wolf' ? '狼人獲勝' : '好人獲勝'; addEl(b);
+      io.sys(G.players.map(p=>`${seatTxt(p.id)} ${p.human?'你':p.name}：${ROLE_NAME[p.role]}`).join('\n'));
+      panel.innerHTML = `<p class="pt">${win?'你贏了':'你輸了'}　${winner==='wolf'?'狼人':'好人'}陣營取得勝利。</p><div class="row"><button class="primary" id="again">再玩一局</button></div>`;
+      $('#again').onclick = ()=>{ $('#app').style.display='none'; $('#start').style.display='flex'; };
+    },
+    ask
+  };
+
+  /* panel */
+  function panelIdle(text){ selectable=null; selected=null; selectCb=null; panel.innerHTML=''; const p=document.createElement('p'); p.className='hint'; p.textContent=text; panel.appendChild(p); renderSeats(); }
+  function ask(cfg){
+    return new Promise(res=>{
+      const done = v=>{ selectable=null; selected=null; selectCb=null; panelIdle('…'); res(v); };
+      scrollLog();
+      if (cfg.type==='info'){
+        panel.innerHTML = `<p class="pt"></p><div class="row"><button class="primary">${cfg.button||'繼續'}</button></div>`;
+        panel.querySelector('.pt').textContent = cfg.text;
+        panel.querySelector('button').onclick = ()=>done(true);
+      } else if (cfg.type==='choice'){
+        panel.innerHTML = '<p class="pt"></p><div class="row"></div>';
+        panel.querySelector('.pt').textContent = cfg.text;
+        cfg.options.forEach((o,i)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=o.label; if(i===0) b.className='primary'; b.onclick=()=>done(o.value); panel.querySelector('.row').appendChild(b); });
+      } else if (cfg.type==='target'){
+        selectable = cfg.targets; selected = null;
+        const draw = ()=>{
+          panel.innerHTML = '<p class="pt"></p><p class="hint"></p><div class="row"></div>';
+          panel.querySelector('.pt').textContent = cfg.text;
+          panel.querySelector('.hint').textContent = selected==null ? '點選上方的座位。' : `已選 ${seatTxt(selected)}。`;
+          const row = panel.querySelector('.row');
+          if (selected!=null){ const ok=document.createElement('button'); ok.type='button'; ok.className='primary'; ok.textContent=`確定：${seatTxt(selected)}`; ok.onclick=()=>done(selected); row.appendChild(ok); }
+          if (cfg.allowSkip){ const sk=document.createElement('button'); sk.type='button'; sk.textContent=cfg.skipLabel||'跳過'; sk.onclick=()=>done(null); row.appendChild(sk); }
+          renderSeats();
+        };
+        selectCb = id=>{ selected=id; draw(); };
+        draw();
+      } else if (cfg.type==='speech'){
+        panel.innerHTML = '<p class="pt"></p><div class="row"></div><form><input type="text" id="saytext" maxlength="80" placeholder="自由發言，例如：3 號很可疑" autocomplete="off"><button class="btn sm" type="submit">送出</button></form>';
+        panel.querySelector('.pt').textContent = cfg.text;
+        const row = panel.querySelector('.row');
+        cfg.options.forEach(o=>{ const b=document.createElement('button'); b.type='button'; b.textContent=o.label; b.onclick=()=>done({value:o.value}); row.appendChild(b); });
+        panel.querySelector('form').onsubmit = e=>{ e.preventDefault(); const v=panel.querySelector('#saytext').value.trim(); if(v) done({text:v}); };
+        renderSeats();
+      }
+    });
+  }
+})();
+</script>
+
+</body></html>
