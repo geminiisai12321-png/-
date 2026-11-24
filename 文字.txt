@@ -1,0 +1,1217 @@
+```html
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
+    <title>塔防王國保衛戰 (Kingdom Defense)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icon CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap');
+        
+        * {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        body {
+            font-family: 'Fredoka', cursive, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            background-color: #0f172a;
+        }
+
+        .canvas-container {
+            position: relative;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+        }
+
+        .btn-action {
+            transition: all 0.15s ease-in-out;
+        }
+
+        .btn-action:hover:not(:disabled) {
+            transform: translateY(-2px);
+            filter: brightness(1.1);
+        }
+
+        .btn-action:active:not(:disabled) {
+            transform: translateY(1px);
+        }
+
+        .tower-card {
+            transition: all 0.2s ease;
+        }
+
+        .tower-card.selected {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+            transform: scale(1.03);
+        }
+
+        .mode-btn-active {
+            box-shadow: 0 0 8px rgba(251, 191, 36, 0.5);
+        }
+
+        canvas {
+            touch-action: none;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex flex-col items-center justify-center p-2 sm:p-4">
+
+    <!-- Header / Stats & Mode Selector Bar -->
+    <div class="w-full max-w-5xl bg-slate-800 rounded-xl p-2.5 sm:p-3 mb-3 border border-slate-700 shadow-lg flex flex-wrap justify-between items-center gap-2 sm:gap-3">
+        <!-- Logo & Title -->
+        <div class="flex items-center gap-2">
+            <i class="fa-solid font-bold text-xl text-amber-500 fa-shield-halved"></i>
+            <h1 class="text-lg sm:text-xl font-bold tracking-wide text-amber-400">王國保衛戰</h1>
+        </div>
+
+        <!-- Mode Selector Buttons -->
+        <div class="flex items-center bg-slate-900/90 rounded-lg p-1 border border-slate-700/80 gap-1 text-xs">
+            <button id="btn-mode-classic" class="btn-action px-2.5 py-1 rounded-md font-semibold text-amber-400 bg-slate-800 border border-amber-500/40 hover:bg-slate-700 flex items-center gap-1 transition-all">
+                <i class="fa-solid fa-trophy text-[10px]"></i> 經典
+            </button>
+            <button id="btn-mode-endless" class="btn-action px-2.5 py-1 rounded-md font-semibold text-purple-300 hover:text-purple-200 bg-slate-800/60 border border-transparent hover:border-purple-500/40 flex items-center gap-1 transition-all">
+                <i class="fa-solid fa-infinity text-[10px]"></i> 無限
+            </button>
+            <button id="btn-mode-practice" class="btn-action px-2.5 py-1 rounded-md font-semibold text-emerald-300 hover:text-emerald-200 bg-slate-800/60 border border-transparent hover:border-emerald-500/40 flex items-center gap-1 transition-all">
+                <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i> 練習
+            </button>
+        </div>
+
+        <!-- Map Selector Buttons -->
+        <div class="flex items-center bg-slate-900/90 rounded-lg p-1 border border-slate-700/80 gap-1 text-xs">
+            <span class="text-slate-400 font-bold px-1 text-[11px]"><i class="fa-solid fa-map"></i> 地圖:</span>
+            <button id="btn-map-0" class="btn-action px-2 py-1 rounded-md font-semibold text-emerald-300 bg-emerald-950/60 border border-emerald-500/50 hover:bg-slate-700 transition-all">綠野</button>
+            <button id="btn-map-1" class="btn-action px-2 py-1 rounded-md font-semibold text-amber-300 bg-slate-800/60 border border-transparent hover:border-amber-500/40 transition-all">峽谷</button>
+            <button id="btn-map-2" class="btn-action px-2 py-1 rounded-md font-semibold text-cyan-300 bg-slate-800/60 border border-transparent hover:border-cyan-500/40 transition-all">冰谷</button>
+            <button id="btn-map-3" class="btn-action px-2 py-1 rounded-md font-semibold text-rose-300 bg-slate-800/60 border border-transparent hover:border-rose-500/40 transition-all">熔岩</button>
+        </div>
+
+        <!-- Resources Stats Display -->
+        <div class="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm font-semibold">
+            <div class="flex items-center gap-1.5 bg-slate-900/80 px-2.5 py-1 rounded-lg border border-slate-700" title="金幣">
+                <i class="fa-solid fa-coins text-amber-400"></i>
+                <span id="gold-display" class="text-amber-300 font-bold">250</span>
+            </div>
+            <div class="flex items-center gap-1.5 bg-slate-900/80 px-2.5 py-1 rounded-lg border border-slate-700" title="城堡生命">
+                <i class="fa-solid fa-heart text-red-500"></i>
+                <span id="lives-display" class="text-red-400 font-bold">20</span>
+            </div>
+            <div class="flex items-center gap-1.5 bg-slate-900/80 px-2.5 py-1 rounded-lg border border-slate-700" title="目前波次">
+                <i class="fa-solid fa-flag text-blue-400"></i>
+                <span id="wave-display" class="text-blue-300 font-bold">0 / 10</span>
+            </div>
+        </div>
+
+        <!-- Action Controls -->
+        <div class="flex items-center gap-1.5">
+            <button id="btn-speed" class="btn-action bg-slate-700 hover:bg-slate-600 text-slate-200 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 text-xs">
+                <i class="fa-solid fa-forward text-[10px]"></i> <span id="speed-text">1x</span>
+            </button>
+            <button id="btn-auto-wave" class="btn-action bg-slate-700 hover:bg-slate-600 text-slate-300 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 text-xs border border-transparent transition-all" title="自動開始下一波">
+                <i class="fa-solid fa-rotate text-[10px]"></i> 自動: <span id="auto-wave-text" class="text-rose-400">關</span>
+            </button>
+            <button id="btn-reset-game" class="btn-action bg-rose-800/80 hover:bg-rose-700 text-rose-100 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 text-xs border border-rose-600/40" title="重置遊戲">
+                <i class="fa-solid fa-rotate-left text-[10px]"></i> 重置
+            </button>
+            <button id="btn-start-wave" class="btn-action bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded-lg font-bold flex items-center gap-1 text-xs shadow-md">
+                <i class="fa-solid fa-play text-[10px]"></i> 開始波次
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Game Area & Sidebar -->
+    <div class="w-full max-w-5xl flex flex-col lg:flex-row gap-4 items-start">
+        
+        <!-- Game Canvas Area -->
+        <div class="canvas-container w-full lg:w-3/4 aspect-[4/3] bg-slate-950 rounded-xl overflow-hidden border-2 border-slate-700 relative">
+            <canvas id="gameCanvas" class="w-full h-full block cursor-pointer"></canvas>
+
+            <!-- Game Over / Victory Overlay -->
+            <div id="game-over-modal" class="hidden absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center z-20">
+                <h2 id="modal-title" class="text-3xl font-extrabold text-red-500 mb-2">城堡陷落！</h2>
+                <p id="modal-desc" class="text-slate-300 mb-6 max-w-md text-sm">怪物突破了防線，王國落入了敵人之手...</p>
+                <div class="flex gap-3">
+                    <button id="btn-restart-modal" class="btn-action bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold px-5 py-2.5 rounded-xl text-sm shadow-lg flex items-center gap-1">
+                        <i class="fa-solid fa-rotate-right"></i> 重新挑戰
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar / Selection Panel -->
+        <div class="w-full lg:w-1/4 flex flex-col gap-3">
+            <div class="bg-slate-800 rounded-xl p-3 border border-slate-700">
+                <h3 class="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider flex items-center justify-between">
+                    <span>建造防禦塔</span>
+                    <span id="current-mode-label" class="text-[10px] text-amber-400 px-1.5 py-0.5 rounded bg-amber-400/10 border border-amber-400/20">經典模式</span>
+                </h3>
+                <div class="grid grid-cols-2 gap-2" id="tower-buttons">
+                    <!-- Archer -->
+                    <button class="tower-card p-2 rounded-lg bg-slate-700/60 border-2 border-slate-600 text-left hover:border-slate-400 cursor-pointer flex flex-col justify-between" data-type="archer">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-emerald-400 text-xs sm:text-sm">弓箭塔</span>
+                            <span class="text-[11px] text-amber-300 font-semibold"><i class="fa-solid fa-coins"></i> 100</span>
+                        </div>
+                        <p class="text-[10px] text-slate-300 mt-1">射速快、連續射擊</p>
+                    </button>
+
+                    <!-- Cannon -->
+                    <button class="tower-card p-2 rounded-lg bg-slate-700/60 border-2 border-slate-600 text-left hover:border-slate-400 cursor-pointer flex flex-col justify-between" data-type="cannon">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-amber-400 text-xs sm:text-sm">加農砲</span>
+                            <span class="text-[11px] text-amber-300 font-semibold"><i class="fa-solid fa-coins"></i> 150</span>
+                        </div>
+                        <p class="text-[10px] text-slate-300 mt-1">範圍爆破傷害</p>
+                    </button>
+
+                    <!-- Ice -->
+                    <button class="tower-card p-2 rounded-lg bg-slate-700/60 border-2 border-slate-600 text-left hover:border-slate-400 cursor-pointer flex flex-col justify-between" data-type="ice">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-cyan-400 text-xs sm:text-sm">冰霜塔</span>
+                            <span class="text-[11px] text-amber-300 font-semibold"><i class="fa-solid fa-coins"></i> 125</span>
+                        </div>
+                        <p class="text-[10px] text-slate-300 mt-1">減緩敵人移動</p>
+                    </button>
+
+                    <!-- Magic -->
+                    <button class="tower-card p-2 rounded-lg bg-slate-700/60 border-2 border-slate-600 text-left hover:border-slate-400 cursor-pointer flex flex-col justify-between" data-type="magic">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-purple-400 text-xs sm:text-sm">雷電塔</span>
+                            <span class="text-[11px] text-amber-300 font-semibold"><i class="fa-solid fa-coins"></i> 200</span>
+                        </div>
+                        <p class="text-[10px] text-slate-300 mt-1">高額貫穿強攻</p>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Practice Spawn Control Panel -->
+            <div id="practice-spawn-panel" class="bg-slate-800 rounded-xl p-3 border border-emerald-500/40 hidden">
+                <h3 class="text-xs font-bold text-emerald-400 mb-2 uppercase tracking-wider flex items-center gap-1.5">
+                    <i class="fa-solid fa-skull text-emerald-400"></i>
+                    <span>召喚特定怪物</span>
+                </h3>
+                <div class="grid grid-cols-2 gap-1.5">
+                    <button class="btn-action bg-orange-600/80 hover:bg-orange-500 text-white p-1.5 rounded-lg font-bold text-xs flex items-center justify-center gap-1 border border-orange-400/40" onclick="spawnPracticeEnemy('normal')">
+                        <i class="fa-solid fa-ghost"></i> 普通怪
+                    </button>
+                    <button class="btn-action bg-rose-600/80 hover:bg-rose-500 text-white p-1.5 rounded-lg font-bold text-xs flex items-center justify-center gap-1 border border-rose-400/40" onclick="spawnPracticeEnemy('fast')">
+                        <i class="fa-solid fa-bolt"></i> 疾行者
+                    </button>
+                    <button class="btn-action bg-slate-600/80 hover:bg-slate-500 text-white p-1.5 rounded-lg font-bold text-xs flex items-center justify-center gap-1 border border-slate-400/40" onclick="spawnPracticeEnemy('armored')">
+                        <i class="fa-solid fa-shield-cat"></i> 裝甲兵
+                    </button>
+                    <button class="btn-action bg-purple-700/80 hover:bg-purple-600 text-white p-1.5 rounded-lg font-bold text-xs flex items-center justify-center gap-1 border border-purple-400/40" onclick="spawnPracticeEnemy('boss')">
+                        <i class="fa-solid fa-dragon"></i> 首領 Boss
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tower Upgrade/Info Panel -->
+            <div id="info-panel" class="bg-slate-800 rounded-xl p-3 border border-slate-700 hidden">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 id="info-title" class="font-bold text-amber-400 text-sm">弓箭塔 (Lv.1)</h3>
+                    <button id="btn-close-info" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-sm"></i></button>
+                </div>
+                <div class="text-xs space-y-1 text-slate-300 mb-3">
+                    <p>傷害: <span id="info-damage" class="text-white font-bold">18</span></p>
+                    <p>彈道數量: <span id="info-bullets" class="text-emerald-400 font-bold">1 發</span></p>
+                    <p>攻擊距離: <span id="info-range" class="text-white font-bold">140</span></p>
+                </div>
+                <div class="flex gap-2">
+                    <button id="btn-upgrade" class="btn-action flex-1 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 disabled:cursor-not-allowed text-white p-2 rounded-lg font-bold text-xs flex justify-center items-center gap-1">
+                        <i class="fa-solid fa-arrow-up"></i> <span id="upgrade-text">升級 (<span id="upgrade-cost">100</span>)</span>
+                    </button>
+                    <button id="btn-sell" class="btn-action flex-1 bg-slate-700 hover:bg-rose-700 text-rose-300 hover:text-white p-2 rounded-lg font-bold text-xs flex justify-center items-center gap-1">
+                        <i class="fa-solid fa-trash"></i> 出售 (<span id="sell-value">50</span>)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tip Card -->
+            <div class="bg-slate-800/60 rounded-xl p-3 border border-slate-700/80 text-xs text-slate-400 space-y-1">
+                <p class="font-bold text-slate-300 flex items-center gap-1">
+                    <i class="fa-regular fa-lightbulb text-amber-400"></i> 玩法說明
+                </p>
+                <p>• 點選上方<b>模式與地圖</b>隨時切換遊玩場景與規則。</p>
+                <p>• 觸控/點擊畫面空白處建造防禦塔，防禦塔可升至 <b>Lv.5</b>，每級增加散射發射數與傷害。</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Game Engine Core Logic -->
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Canvas dimensions
+        const BASE_WIDTH = 800;
+        const BASE_HEIGHT = 600;
+        canvas.width = BASE_WIDTH;
+        canvas.height = BASE_HEIGHT;
+
+        const MAPS = [
+            {
+                name: "綠野平原",
+                bgColor: '#1e3a1e',
+                pathOuterColor: '#b45309',
+                pathInnerColor: '#d97706',
+                decorations: [
+                    { type: 'tree', x: 100, y: 220 },
+                    { type: 'tree', x: 350, y: 100 },
+                    { type: 'tree', x: 600, y: 80 },
+                    { type: 'tree', x: 380, y: 480 },
+                    { type: 'tree', x: 120, y: 450 }
+                ],
+                path: [
+                    { x: -20, y: 120 }, { x: 220, y: 120 }, { x: 220, y: 320 },
+                    { x: 500, y: 320 }, { x: 500, y: 180 }, { x: 700, y: 180 },
+                    { x: 700, y: 500 }, { x: 820, y: 500 }
+                ]
+            },
+            {
+                name: "荒漠峽谷",
+                bgColor: '#4a2c11',
+                pathOuterColor: '#78350f',
+                pathInnerColor: '#a16207',
+                decorations: [
+                    { type: 'rock', x: 140, y: 200 },
+                    { type: 'rock', x: 420, y: 120 },
+                    { type: 'rock', x: 620, y: 420 },
+                    { type: 'rock', x: 260, y: 480 }
+                ],
+                path: [
+                    { x: -20, y: 300 }, { x: 180, y: 300 }, { x: 180, y: 100 },
+                    { x: 620, y: 100 }, { x: 620, y: 500 }, { x: 380, y: 500 },
+                    { x: 380, y: 280 }, { x: 820, y: 280 }
+                ]
+            },
+            {
+                name: "冰霜谷地",
+                bgColor: '#0f2b46',
+                pathOuterColor: '#0284c7',
+                pathInnerColor: '#38bdf8',
+                decorations: [
+                    { type: 'crystal', x: 120, y: 100 },
+                    { type: 'crystal', x: 520, y: 220 },
+                    { type: 'crystal', x: 280, y: 380 },
+                    { type: 'crystal', x: 680, y: 120 }
+                ],
+                path: [
+                    { x: 400, y: -20 }, { x: 400, y: 180 }, { x: 150, y: 180 },
+                    { x: 150, y: 450 }, { x: 650, y: 450 }, { x: 650, y: 300 },
+                    { x: 820, y: 300 }
+                ]
+            },
+            {
+                name: "熔岩要塞",
+                bgColor: '#2a0808',
+                pathOuterColor: '#991b1b',
+                pathInnerColor: '#dc2626',
+                decorations: [
+                    { type: 'lava', x: 180, y: 180 },
+                    { type: 'lava', x: 580, y: 380 },
+                    { type: 'rock', x: 350, y: 280 },
+                    { type: 'rock', x: 650, y: 150 }
+                ],
+                path: [
+                    { x: -20, y: 500 }, { x: 300, y: 500 }, { x: 300, y: 120 },
+                    { x: 520, y: 120 }, { x: 520, y: 420 }, { x: 700, y: 420 },
+                    { x: 700, y: -20 }
+                ]
+            }
+        ];
+
+        let selectedMapIndex = 0;
+        let currentMap = MAPS[selectedMapIndex];
+        let path = currentMap.path;
+
+        const PATH_WIDTH = 45;
+        const TOWER_RADIUS = 22;
+
+        // Tower Configurations
+        const TOWER_TYPES = {
+            archer: {
+                name: '弓箭塔',
+                cost: 100,
+                damage: 18,
+                range: 140,
+                fireRate: 25,
+                bulletSpeed: 7,
+                color: '#10b981',
+                splash: 0,
+                slow: false
+            },
+            cannon: {
+                name: '加農砲',
+                cost: 150,
+                damage: 45,
+                range: 120,
+                fireRate: 60,
+                bulletSpeed: 5,
+                color: '#f59e0b',
+                splash: 65,
+                slow: false
+            },
+            ice: {
+                name: '冰霜塔',
+                cost: 125,
+                damage: 12,
+                range: 110,
+                fireRate: 35,
+                bulletSpeed: 6,
+                color: '#06b6d4',
+                splash: 40,
+                slow: true
+            },
+            magic: {
+                name: '雷電塔',
+                cost: 200,
+                damage: 65,
+                range: 160,
+                fireRate: 50,
+                bulletSpeed: 9,
+                color: '#a855f7',
+                splash: 0,
+                slow: false
+            }
+        };
+
+        // Game State Variables
+        let currentMode = 'classic';
+        let gold = 250;
+        let lives = 20;
+        let currentWave = 0;
+        let maxWaves = 10;
+        let gameSpeed = 1;
+        let autoWave = false;
+        let autoWaveCountdown = 0;
+        let isWaveActive = false;
+        let isSpawning = false;
+        let spawnInterval = null;
+        let selectedTowerType = null;
+        let selectedTower = null;
+        let gameOver = false;
+        let gameWon = false;
+        let mouseX = -100;
+        let mouseY = -100;
+
+        // Dynamic Entities
+        let towers = [];
+        let enemies = [];
+        let projectiles = [];
+        let particles = [];
+
+        // UI Element References
+        const goldDisplay = document.getElementById('gold-display');
+        const livesDisplay = document.getElementById('lives-display');
+        const waveDisplay = document.getElementById('wave-display');
+        const speedBtn = document.getElementById('btn-speed');
+        const speedText = document.getElementById('speed-text');
+        const autoWaveBtn = document.getElementById('btn-auto-wave');
+        const autoWaveText = document.getElementById('auto-wave-text');
+        const resetBtn = document.getElementById('btn-reset-game');
+        const startWaveBtn = document.getElementById('btn-start-wave');
+        const towerButtons = document.querySelectorAll('.tower-card');
+        const infoPanel = document.getElementById('info-panel');
+        const modal = document.getElementById('game-over-modal');
+
+        const btnClassic = document.getElementById('btn-mode-classic');
+        const btnEndless = document.getElementById('btn-mode-endless');
+        const btnPractice = document.getElementById('btn-mode-practice');
+        const currentModeLabel = document.getElementById('current-mode-label');
+        const practiceSpawnPanel = document.getElementById('practice-spawn-panel');
+
+        document.querySelectorAll('[id^="btn-map-"]').forEach((btn, index) => {
+            btn.addEventListener('click', () => {
+                selectedMapIndex = index;
+                currentMap = MAPS[selectedMapIndex];
+                path = currentMap.path;
+
+                document.querySelectorAll('[id^="btn-map-"]').forEach((b, i) => {
+                    if (i === index) {
+                        b.className = "btn-action px-2 py-1 rounded-md font-semibold text-amber-300 bg-amber-950/80 border border-amber-500/60 transition-all";
+                    } else {
+                        b.className = "btn-action px-2 py-1 rounded-md font-semibold text-slate-300 bg-slate-800/60 border border-transparent hover:border-slate-500/40 transition-all";
+                    }
+                });
+
+                resetGame();
+            });
+        });
+
+        // Toggle Auto Wave Mode
+        autoWaveBtn.addEventListener('click', () => {
+            autoWave = !autoWave;
+            if (autoWave) {
+                autoWaveText.textContent = "開";
+                autoWaveText.className = "text-emerald-400 font-bold";
+                autoWaveBtn.className = "btn-action bg-emerald-900/60 text-emerald-200 border border-emerald-500/50 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 text-xs transition-all";
+            } else {
+                autoWaveText.textContent = "關";
+                autoWaveText.className = "text-rose-400";
+                autoWaveBtn.className = "btn-action bg-slate-700 hover:bg-slate-600 text-slate-300 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 text-xs border border-transparent transition-all";
+                autoWaveCountdown = 0;
+            }
+        });
+
+        // Mode Switching Handlers
+        btnClassic.addEventListener('click', () => switchMode('classic'));
+        btnEndless.addEventListener('click', () => switchMode('endless'));
+        btnPractice.addEventListener('click', () => switchMode('practice'));
+
+        function switchMode(mode) {
+            currentMode = mode;
+            
+            [btnClassic, btnEndless, btnPractice].forEach(btn => {
+                btn.className = "btn-action px-2.5 py-1 rounded-md font-semibold text-xs flex items-center gap-1 transition-all bg-slate-800/60 border border-transparent text-slate-300";
+            });
+
+            if (mode === 'classic') {
+                btnClassic.className = "btn-action px-2.5 py-1 rounded-md font-semibold text-xs flex items-center gap-1 transition-all bg-amber-500/20 border border-amber-500/60 text-amber-300 mode-btn-active";
+                currentModeLabel.textContent = "經典模式";
+                currentModeLabel.className = "text-[10px] text-amber-400 px-1.5 py-0.5 rounded bg-amber-400/10 border border-amber-400/20";
+                maxWaves = 10;
+                practiceSpawnPanel.classList.add('hidden');
+            } else if (mode === 'endless') {
+                btnEndless.className = "btn-action px-2.5 py-1 rounded-md font-semibold text-xs flex items-center gap-1 transition-all bg-purple-500/20 border border-purple-500/60 text-purple-300 mode-btn-active";
+                currentModeLabel.textContent = "無限模式";
+                currentModeLabel.className = "text-[10px] text-purple-400 px-1.5 py-0.5 rounded bg-purple-400/10 border border-purple-400/20";
+                maxWaves = Infinity;
+                practiceSpawnPanel.classList.add('hidden');
+            } else if (mode === 'practice') {
+                btnPractice.className = "btn-action px-2.5 py-1 rounded-md font-semibold text-xs flex items-center gap-1 transition-all bg-emerald-500/20 border border-emerald-500/60 text-emerald-300 mode-btn-active";
+                currentModeLabel.textContent = "練習模式";
+                currentModeLabel.className = "text-[10px] text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-400/10 border border-emerald-400/20";
+                maxWaves = Infinity;
+                practiceSpawnPanel.classList.remove('hidden');
+            }
+
+            resetGame();
+        }
+
+        function spawnPracticeEnemy(type) {
+            if (gameOver || gameWon) return;
+            enemies.push(new Enemy(type, Math.max(1, currentWave)));
+        }
+
+        class Enemy {
+            constructor(type, waveBonus) {
+                this.x = path[0].x;
+                this.y = path[0].y;
+                this.pathIndex = 0;
+                this.slowTimer = 0;
+
+                const healthMultiplier = Math.pow(1.08, Math.max(0, waveBonus - 10));
+
+                if (type === 'fast') {
+                    this.speed = 2.2;
+                    this.maxHp = Math.floor((60 + waveBonus * 25) * healthMultiplier);
+                    this.color = '#e11d48';
+                    this.radius = 10;
+                    this.reward = 15;
+                } else if (type === 'boss') {
+                    this.speed = 0.8;
+                    this.maxHp = Math.floor((500 + waveBonus * 200) * healthMultiplier);
+                    this.color = '#7e22ce';
+                    this.radius = 20;
+                    this.reward = 100;
+                } else if (type === 'armored') {
+                    this.speed = 1.1;
+                    this.maxHp = Math.floor((180 + waveBonus * 65) * healthMultiplier);
+                    this.color = '#475569';
+                    this.radius = 15;
+                    this.reward = 35;
+                } else {
+                    this.speed = 1.4;
+                    this.maxHp = Math.floor((90 + waveBonus * 35) * healthMultiplier);
+                    this.color = '#ea580c';
+                    this.radius = 12;
+                    this.reward = 20;
+                }
+                this.hp = this.maxHp;
+            }
+
+            update() {
+                if (this.slowTimer > 0) this.slowTimer--;
+
+                const currentSpeed = (this.slowTimer > 0) ? this.speed * 0.5 : this.speed;
+                const target = path[this.pathIndex + 1];
+
+                if (!target) return;
+
+                const dx = target.x - this.x;
+                const dy = target.y - this.y;
+                const dist = Math.hypot(dx, dy);
+
+                if (dist < currentSpeed * gameSpeed) {
+                    this.x = target.x;
+                    this.y = target.y;
+                    this.pathIndex++;
+                    if (this.pathIndex >= path.length - 1) {
+                        if (currentMode !== 'practice') {
+                            lives--;
+                            livesDisplay.textContent = lives;
+                        }
+                        this.hp = 0;
+                        if (lives <= 0 && currentMode !== 'practice') handleGameOver(false);
+                    }
+                } else {
+                    this.x += (dx / dist) * currentSpeed * gameSpeed;
+                    this.y += (dy / dist) * currentSpeed * gameSpeed;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                ctx.fillStyle = this.slowTimer > 0 ? '#06b6d4' : this.color;
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                // HP Bar
+                const barW = this.radius * 2.2;
+                const barH = 4;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                ctx.fillRect(-barW / 2, -this.radius - 8, barW, barH);
+
+                const hpRatio = Math.max(0, this.hp / this.maxHp);
+                ctx.fillStyle = hpRatio > 0.5 ? '#22c55e' : hpRatio > 0.2 ? '#eab308' : '#ef4444';
+                ctx.fillRect(-barW / 2, -this.radius - 8, barW * hpRatio, barH);
+
+                ctx.restore();
+            }
+        }
+
+        class Tower {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type;
+                this.level = 1;
+                this.config = { ...TOWER_TYPES[type] };
+                this.cooldown = 0;
+            }
+
+            getUpgradeCost() {
+                return Math.floor(this.config.cost * Math.pow(1.5, this.level));
+            }
+
+            update() {
+                if (this.cooldown > 0) this.cooldown -= gameSpeed;
+
+                if (this.cooldown <= 0) {
+                    let target = null;
+                    let minDist = this.config.range;
+
+                    for (let enemy of enemies) {
+                        const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
+                        if (dist <= minDist) {
+                            minDist = dist;
+                            target = enemy;
+                        }
+                    }
+
+                    if (target) {
+                        this.fire(target);
+                        this.cooldown = this.config.fireRate;
+                    }
+                }
+            }
+
+            fire(target) {
+                const bulletCount = this.level;
+                const baseAngle = Math.atan2(target.y - this.y, target.x - this.x);
+                const spreadAngle = 0.15;
+
+                const startAngle = baseAngle - ((bulletCount - 1) * spreadAngle) / 2;
+
+                for (let i = 0; i < bulletCount; i++) {
+                    const angle = startAngle + i * spreadAngle;
+                    projectiles.push(new Projectile(this, target, angle));
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                // Base platform
+                ctx.fillStyle = '#334155';
+                ctx.beginPath();
+                ctx.arc(0, 0, TOWER_RADIUS + 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Inner Body
+                ctx.fillStyle = this.config.color;
+                ctx.beginPath();
+                ctx.arc(0, 0, TOWER_RADIUS - 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Display Stars for Level
+                ctx.fillStyle = '#fde047';
+                const startX = -((this.level - 1) * 6) / 2;
+                for (let i = 0; i < this.level; i++) {
+                    ctx.beginPath();
+                    ctx.arc(startX + i * 6, 12, 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+
+                // Range Indicator
+                if (selectedTower === this) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.config.range, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(59, 130, 246, 0.15)';
+                    ctx.fill();
+                    ctx.strokeStyle = '#3b82f6';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+
+            upgrade() {
+                if (this.level >= 5) return;
+
+                const cost = this.getUpgradeCost();
+                if (gold >= cost || currentMode === 'practice') {
+                    if (currentMode !== 'practice') {
+                        gold -= cost;
+                        goldDisplay.textContent = gold;
+                    }
+                    this.level++;
+                    this.config.damage = Math.floor(this.config.damage * 1.35);
+                    this.config.range = Math.floor(this.config.range * 1.08);
+                    updateInfoPanel();
+                }
+            }
+
+            sell() {
+                if (currentMode !== 'practice') {
+                    let totalInvested = this.config.cost;
+                    for (let lvl = 1; lvl < this.level; lvl++) {
+                        totalInvested += Math.floor(this.config.cost * Math.pow(1.5, lvl));
+                    }
+                    const returnGold = Math.floor(totalInvested * 0.6);
+                    gold += returnGold;
+                    goldDisplay.textContent = gold;
+                }
+                towers = towers.filter(t => t !== this);
+                deselectTower();
+            }
+        }
+
+        class Projectile {
+            constructor(tower, target, angle) {
+                this.x = tower.x;
+                this.y = tower.y;
+                this.tower = tower;
+                this.target = target;
+                this.speed = tower.config.bulletSpeed;
+                this.vx = Math.cos(angle) * this.speed;
+                this.vy = Math.sin(angle) * this.speed;
+                this.life = 120;
+            }
+
+            update() {
+                this.x += this.vx * gameSpeed;
+                this.y += this.vy * gameSpeed;
+                this.life -= gameSpeed;
+
+                for (let enemy of enemies) {
+                    if (Math.hypot(enemy.x - this.x, enemy.y - this.y) < enemy.radius + 4) {
+                        this.hit(enemy);
+                        return true;
+                    }
+                }
+
+                return this.life <= 0 || this.x < 0 || this.x > BASE_WIDTH || this.y < 0 || this.y > BASE_HEIGHT;
+            }
+
+            hit(enemy) {
+                const cfg = this.tower.config;
+                if (cfg.splash) {
+                    enemies.forEach(e => {
+                        if (Math.hypot(e.x - this.x, e.y - this.y) <= cfg.splash) {
+                            e.hp -= cfg.damage;
+                            if (cfg.slow) e.slowTimer = 90;
+                        }
+                    });
+                    createExplosion(this.x, this.y, cfg.color);
+                } else {
+                    enemy.hp -= cfg.damage;
+                    if (cfg.slow) enemy.slowTimer = 120;
+                    createExplosion(this.x, this.y, cfg.color);
+                }
+
+                if (enemy.hp <= 0 && enemy.rewardGiven !== true) {
+                    enemy.rewardGiven = true;
+                    if (currentMode !== 'practice') {
+                        gold += enemy.reward;
+                        goldDisplay.textContent = gold;
+                    }
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.fillStyle = this.tower.config.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function isPointOnPath(x, y) {
+            for (let i = 0; i < path.length - 1; i++) {
+                const p1 = path[i];
+                const p2 = path[i + 1];
+
+                const l2 = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                if (l2 === 0) continue;
+
+                let t = ((x - p1.x) * (p2.x - p1.x) + (y - p1.y) * (p2.y - p1.y)) / (l2 * l2);
+                t = Math.max(0, Math.min(1, t));
+
+                const projX = p1.x + t * (p2.x - p1.x);
+                const projY = p1.y + t * (p2.y - p1.y);
+
+                if (Math.hypot(x - projX, y - projY) < PATH_WIDTH / 2 + TOWER_RADIUS) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function isValidBuildPosition(x, y) {
+            if (isPointOnPath(x, y)) return false;
+            for (let t of towers) {
+                if (Math.hypot(t.x - x, t.y - y) < TOWER_RADIUS * 2) return false;
+            }
+            return true;
+        }
+
+        function drawTree(x, y) {
+            ctx.fillStyle = '#15803d';
+            ctx.beginPath(); ctx.arc(x, y, 16, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#166534';
+            ctx.beginPath(); ctx.arc(x - 5, y - 5, 10, 0, Math.PI * 2); ctx.fill();
+        }
+
+        function drawDecorations() {
+            currentMap.decorations.forEach(dec => {
+                if (dec.type === 'tree') {
+                    drawTree(dec.x, dec.y);
+                } else if (dec.type === 'rock') {
+                    ctx.fillStyle = '#64748b';
+                    ctx.beginPath(); ctx.arc(dec.x, dec.y, 14, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#475569';
+                    ctx.beginPath(); ctx.arc(dec.x - 3, dec.y - 3, 8, 0, Math.PI * 2); ctx.fill();
+                } else if (dec.type === 'crystal') {
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.beginPath();
+                    ctx.moveTo(dec.x, dec.y - 15);
+                    ctx.lineTo(dec.x + 10, dec.y + 10);
+                    ctx.lineTo(dec.x - 10, dec.y + 10);
+                    ctx.closePath();
+                    ctx.fill();
+                } else if (dec.type === 'lava') {
+                    ctx.fillStyle = '#ef4444';
+                    ctx.beginPath(); ctx.arc(dec.x, dec.y, 18, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#f97316';
+                    ctx.beginPath(); ctx.arc(dec.x, dec.y, 10, 0, Math.PI * 2); ctx.fill();
+                }
+            });
+        }
+
+        function drawBackground() {
+            ctx.fillStyle = currentMap.bgColor;
+            ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+
+            ctx.strokeStyle = currentMap.pathOuterColor;
+            ctx.lineWidth = PATH_WIDTH;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(path[0].x, path[0].y);
+            for (let i = 1; i < path.length; i++) {
+                ctx.lineTo(path[i].x, path[i].y);
+            }
+            ctx.stroke();
+
+            ctx.strokeStyle = currentMap.pathInnerColor;
+            ctx.lineWidth = PATH_WIDTH - 8;
+            ctx.stroke();
+
+            drawDecorations();
+
+            if (selectedTowerType && mouseX > 0 && mouseY > 0) {
+                const valid = isValidBuildPosition(mouseX, mouseY);
+                const cfg = TOWER_TYPES[selectedTowerType];
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(mouseX, mouseY, cfg.range, 0, Math.PI * 2);
+                ctx.fillStyle = valid ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)';
+                ctx.fill();
+                ctx.strokeStyle = valid ? '#22c55e' : '#ef4444';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(mouseX, mouseY, TOWER_RADIUS, 0, Math.PI * 2);
+                ctx.fillStyle = valid ? cfg.color : '#ef4444';
+                ctx.globalAlpha = 0.6;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 5; i++) {
+                particles.push({
+                    x, y,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: (Math.random() - 0.5) * 4,
+                    life: 12,
+                    color
+                });
+            }
+        }
+
+        function spawnWave() {
+            if (isWaveActive || isSpawning || gameOver || gameWon) return;
+
+            if (spawnInterval) {
+                clearInterval(spawnInterval);
+                spawnInterval = null;
+            }
+
+            autoWaveCountdown = 0;
+            currentWave++;
+            if (currentMode === 'classic' && currentWave > maxWaves) return;
+
+            waveDisplay.textContent = maxWaves === Infinity ? `${currentWave} / ∞` : `${currentWave} / ${maxWaves}`;
+            isWaveActive = true;
+            isSpawning = true;
+            startWaveBtn.disabled = true;
+
+            const count = 5 + currentWave * 3;
+            let spawned = 0;
+
+            spawnInterval = setInterval(() => {
+                if (gameOver || gameWon) {
+                    clearInterval(spawnInterval);
+                    spawnInterval = null;
+                    isSpawning = false;
+                    return;
+                }
+
+                let type = 'normal';
+                if (currentWave >= 3 && Math.random() < 0.35) type = 'fast';
+                if (currentWave >= 5 && Math.random() < 0.3) type = 'armored';
+                if (currentWave % 5 === 0 && spawned === count - 1) type = 'boss';
+
+                enemies.push(new Enemy(type, currentWave));
+                spawned++;
+
+                if (spawned >= count) {
+                    clearInterval(spawnInterval);
+                    spawnInterval = null;
+                    isSpawning = false;
+                }
+            }, 1000 / gameSpeed);
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+
+            drawBackground();
+
+            towers.forEach(tower => {
+                tower.update();
+                tower.draw();
+            });
+
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                enemies[i].update();
+                enemies[i].draw();
+                if (enemies[i].hp <= 0) {
+                    enemies.splice(i, 1);
+                }
+            }
+
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                if (projectiles[i].update()) {
+                    projectiles.splice(i, 1);
+                } else {
+                    projectiles[i].draw();
+                }
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, 3, 3);
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+
+            if (isWaveActive && !isSpawning && enemies.length === 0) {
+                isWaveActive = false;
+                startWaveBtn.disabled = false;
+                
+                if (currentMode === 'classic' && currentWave >= maxWaves) {
+                    handleGameOver(true);
+                } else if (autoWave && !gameOver && !gameWon) {
+                    autoWaveCountdown = Math.floor(70 / gameSpeed);
+                }
+            }
+
+            if (!isWaveActive && !isSpawning && autoWave && enemies.length === 0 && !gameOver && !gameWon) {
+                if (autoWaveCountdown > 0) {
+                    autoWaveCountdown -= gameSpeed;
+                    if (autoWaveCountdown <= 0) {
+                        spawnWave();
+                    }
+                }
+            }
+
+            if (!gameOver && !gameWon) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function resetGame() {
+            if (spawnInterval) {
+                clearInterval(spawnInterval);
+                spawnInterval = null;
+            }
+
+            autoWaveCountdown = 0;
+            isSpawning = false;
+
+            if (currentMode === 'practice') {
+                gold = 99999;
+                lives = 999;
+            } else {
+                gold = 250;
+                lives = 20;
+            }
+
+            currentWave = 0;
+            gameSpeed = 1;
+            selectedTowerType = null;
+            selectedTower = null;
+            isWaveActive = false;
+            gameOver = false;
+            gameWon = false;
+
+            towers = [];
+            enemies = [];
+            projectiles = [];
+            particles = [];
+
+            goldDisplay.textContent = currentMode === 'practice' ? '∞' : gold;
+            livesDisplay.textContent = currentMode === 'practice' ? '∞' : lives;
+            waveDisplay.textContent = maxWaves === Infinity ? `0 / ∞` : `0 / ${maxWaves}`;
+            speedText.textContent = "1x";
+            startWaveBtn.disabled = false;
+
+            towerButtons.forEach(btn => btn.classList.remove('selected'));
+            infoPanel.classList.add('hidden');
+            modal.classList.add('hidden');
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function handleGameOver(win) {
+            modal.classList.remove('hidden');
+            const title = document.getElementById('modal-title');
+            const desc = document.getElementById('modal-desc');
+
+            if (win) {
+                gameWon = true;
+                title.textContent = "王國勝利！";
+                title.className = "text-3xl font-extrabold text-emerald-400 mb-2";
+                desc.textContent = "您成功擊退了所有怪物波次，守護了王國和平！";
+            } else {
+                gameOver = true;
+                title.textContent = currentMode === 'endless' ? "挑戰結束！" : "城堡陷落！";
+                title.className = "text-3xl font-extrabold text-rose-500 mb-2";
+                desc.textContent = currentMode === 'endless' 
+                    ? `您在無限模式中成功生存了 ${currentWave} 波怪物！` 
+                    : "防線被突破，請調整策略重新再來！";
+            }
+        }
+
+        // Handle Mouse & Mobile Touch Coordinates Scaling
+        function getCanvasCoordinates(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            const scaleX = BASE_WIDTH / rect.width;
+            const scaleY = BASE_HEIGHT / rect.height;
+
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        function handlePointerMove(e) {
+            if (e.type === 'touchmove') e.preventDefault();
+            const coords = getCanvasCoordinates(e);
+            mouseX = coords.x;
+            mouseY = coords.y;
+        }
+
+        function handlePointerLeave() {
+            mouseX = -100;
+            mouseY = -100;
+        }
+
+        function handlePointerClick(e) {
+            if (e.type === 'touchend') e.preventDefault();
+            const coords = getCanvasCoordinates(e.type === 'touchend' ? e.changedTouches[0] : e);
+            const clickX = coords.x;
+            const clickY = coords.y;
+
+            const clickedTower = towers.find(t => Math.hypot(t.x - clickX, t.y - clickY) < TOWER_RADIUS + 5);
+            if (clickedTower) {
+                selectTowerInstance(clickedTower);
+                return;
+            }
+
+            if (selectedTowerType) {
+                if (isValidBuildPosition(clickX, clickY)) {
+                    const config = TOWER_TYPES[selectedTowerType];
+                    if (gold >= config.cost || currentMode === 'practice') {
+                        if (currentMode !== 'practice') {
+                            gold -= config.cost;
+                            goldDisplay.textContent = gold;
+                        }
+                        towers.push(new Tower(clickX, clickY, selectedTowerType));
+                        deselectTower();
+                    }
+                }
+            } else {
+                deselectTower();
+            }
+        }
+
+        // Pointer / Touch Listeners for Desktop and Mobile/iPhone
+        canvas.addEventListener('mousemove', handlePointerMove);
+        canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
+        canvas.addEventListener('mouseleave', handlePointerLeave);
+        canvas.addEventListener('click', handlePointerClick);
+        canvas.addEventListener('touchend', handlePointerClick, { passive: false });
+
+        towerButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                deselectTower();
+                const type = btn.dataset.type;
+                if (selectedTowerType === type) {
+                    selectedTowerType = null;
+                    btn.classList.remove('selected');
+                } else {
+                    towerButtons.forEach(b => b.classList.remove('selected'));
+                    selectedTowerType = type;
+                    btn.classList.add('selected');
+                }
+            });
+        });
+
+        function selectTowerInstance(tower) {
+            selectedTower = tower;
+            selectedTowerType = null;
+            towerButtons.forEach(b => b.classList.remove('selected'));
+            updateInfoPanel();
+            infoPanel.classList.remove('hidden');
+        }
+
+        function deselectTower() {
+            selectedTower = null;
+            infoPanel.classList.add('hidden');
+        }
+
+        function updateInfoPanel() {
+            if (!selectedTower) return;
+            document.getElementById('info-title').textContent = `${selectedTower.config.name} (Lv.${selectedTower.level})`;
+            document.getElementById('info-damage').textContent = selectedTower.config.damage;
+            document.getElementById('info-bullets').textContent = `${selectedTower.level} 發`;
+            document.getElementById('info-range').textContent = selectedTower.config.range;
+
+            const upgradeBtn = document.getElementById('btn-upgrade');
+            const upgradeText = document.getElementById('upgrade-text');
+
+            if (selectedTower.level >= 5) {
+                upgradeBtn.disabled = true;
+                upgradeText.textContent = "已達最高等級 (MAX)";
+            } else {
+                upgradeBtn.disabled = false;
+                const cost = selectedTower.getUpgradeCost();
+                upgradeText.innerHTML = `升級 (<span id="upgrade-cost">${cost}</span>)`;
+            }
+
+            let totalInvested = selectedTower.config.cost;
+            for (let lvl = 1; lvl < selectedTower.level; lvl++) {
+                totalInvested += Math.floor(selectedTower.config.cost * Math.pow(1.5, lvl));
+            }
+            document.getElementById('sell-value').textContent = Math.floor(totalInvested * 0.6);
+        }
+
+        document.getElementById('btn-close-info').addEventListener('click', deselectTower);
+        document.getElementById('btn-upgrade').addEventListener('click', () => selectedTower && selectedTower.upgrade());
+        document.getElementById('btn-sell').addEventListener('click', () => selectedTower && selectedTower.sell());
+        startWaveBtn.addEventListener('click', spawnWave);
+        resetBtn.addEventListener('click', resetGame);
+        document.getElementById('btn-restart-modal').addEventListener('click', resetGame);
+
+        speedBtn.addEventListener('click', () => {
+            gameSpeed = gameSpeed === 1 ? 2 : 1;
+            speedText.textContent = `${gameSpeed}x`;
+        });
+
+        // Initialize default mode
+        switchMode('classic');
+    </script>
+</body>
+</html>
+
+```
