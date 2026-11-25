@@ -1,0 +1,1378 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>線上西洋棋</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: board on the left, status / controls / move list in a side panel; the panel stacks under the board on phones. Slate-blue board, solid glyph pieces. */
+:root {
+  --bg: #f1f4f7;
+  --surface: #ffffff;
+  --fg: #18222d;
+  --muted: #5a6978;
+  --line: #d3dbe3;
+  --accent: #1c6e8c;
+  --accent-fg: #ffffff;
+  --danger: #b83a2c;
+  --good: #1f7a52;
+  --sq-light: #dde4ea;
+  --sq-dark: #7690a6;
+  --coord-on-light: #6a8499;
+  --coord-on-dark: #e6ecf1;
+  --hl-last: rgba(240, 196, 50, .55);
+  --hl-sel: rgba(40, 170, 115, .55);
+  --piece-white: #ffffff;
+  --piece-white-stroke: #1d2733;
+  --piece-black: #14191f;
+  --font-display: "Space Grotesk", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-body: "Inter", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1418;
+    --surface: #182027;
+    --fg: #e4eaf0;
+    --muted: #8fa0b0;
+    --line: #2a353f;
+    --accent: #5ec0e0;
+    --accent-fg: #06232d;
+    --danger: #ff8272;
+    --good: #5fd09b;
+    --sq-light: #c9d2da;
+    --sq-dark: #60798d;
+    --coord-on-light: #60798d;
+    --coord-on-dark: #dfe6ec;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1418;
+  --surface: #182027;
+  --fg: #e4eaf0;
+  --muted: #8fa0b0;
+  --line: #2a353f;
+  --accent: #5ec0e0;
+  --accent-fg: #06232d;
+  --danger: #ff8272;
+  --good: #5fd09b;
+  --sq-light: #c9d2da;
+  --sq-dark: #60798d;
+  --coord-on-light: #60798d;
+  --coord-on-dark: #dfe6ec;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+button { font: inherit; color: inherit; }
+button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.app {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding-block: 20px 36px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.head { margin-bottom: 14px; }
+h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.9rem;
+  line-height: 1.15;
+  margin: 0;
+  text-wrap: balance;
+}
+.sub { margin: 4px 0 0; color: var(--muted); }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+@media (min-width: 860px) {
+  .layout { grid-template-columns: minmax(0, 640px) 320px; justify-content: center; align-items: start; gap: 24px; }
+}
+.boardcol { display: grid; gap: 8px; min-width: 0; width: 100%; }
+.side { display: grid; gap: 12px; min-width: 0; }
+
+/* player rows */
+.player {
+  display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 2px; min-width: 0;
+}
+.player .chip { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--fg); flex: none; }
+.player .chip.w { background: #fff; }
+.player .chip.b { background: #14191f; }
+.player.active .chip { box-shadow: 0 0 0 3px var(--accent); }
+.player .pname { font-weight: 600; white-space: nowrap; }
+.player .caps { display: flex; flex-wrap: wrap; align-items: center; min-width: 0; flex: 1; }
+.player .adv { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 600; }
+.caps .piece { font-size: 1.15rem; width: .8em; }
+
+/* board */
+.board {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  aspect-ratio: 1;
+  width: 100%;
+  container-type: inline-size;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,.12), 0 8px 24px rgba(10, 30, 50, .14);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+.sq {
+  position: relative; display: grid; place-items: center;
+  border: 0; padding: 0; margin: 0; min-width: 0; min-height: 0;
+  background: var(--sq-light);
+  cursor: pointer; appearance: none; -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.sq.dark { background: var(--sq-dark); }
+.sq.last { background-image: linear-gradient(var(--hl-last), var(--hl-last)); }
+.sq.sel { background-image: linear-gradient(var(--hl-sel), var(--hl-sel)); }
+.sq.check { background-image: radial-gradient(circle at 50% 50%, rgba(220, 40, 30, .85) 0%, rgba(220, 40, 30, .45) 45%, rgba(220, 40, 30, 0) 75%); }
+.sq:focus-visible { outline-offset: -4px; }
+.sq[data-rank]::before, .sq[data-file]::after {
+  position: absolute; font-size: max(9px, 1.9cqw); font-weight: 600; line-height: 1; pointer-events: none;
+  color: var(--coord-on-light);
+}
+.sq.dark[data-rank]::before, .sq.dark[data-file]::after { color: var(--coord-on-dark); }
+.sq[data-rank]::before { content: attr(data-rank); top: 3px; left: 4px; }
+.sq[data-file]::after { content: attr(data-file); bottom: 3px; right: 4px; }
+
+.piece {
+  font-family: "Noto Sans Symbols 2", "Segoe UI Symbol", "Apple Symbols", "DejaVu Sans", "Arial Unicode MS", sans-serif;
+  font-size: min(8.6vw, 54px);
+  font-size: 10.4cqw;
+  line-height: 1;
+  pointer-events: none;
+  font-variant-emoji: text;
+}
+.piece.w { color: var(--piece-white); -webkit-text-stroke: 1.4px var(--piece-white-stroke); paint-order: stroke fill; }
+.piece.b { color: var(--piece-black); text-shadow: 0 0 .05em rgba(255, 255, 255, .4); }
+.caps .piece { font-size: 1.15rem; }
+
+.dot { position: absolute; width: 30%; height: 30%; border-radius: 50%; background: rgba(15, 25, 35, .3); pointer-events: none; }
+.dot.cap { width: 100%; height: 100%; background: radial-gradient(circle, transparent 56%, rgba(15, 25, 35, .32) 58%); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .sq.landed .piece { animation: land .16s ease-out; }
+  @keyframes land { from { transform: scale(1.18); } to { transform: scale(1); } }
+}
+
+/* promotion chooser */
+.promo {
+  position: absolute; inset: 0; z-index: 5; display: grid; place-items: center;
+  background: rgba(8, 14, 20, .6);
+}
+.promo-box {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px; display: grid; gap: 10px; justify-items: center; max-width: 90%;
+}
+.promo-box p { margin: 0; font-weight: 600; }
+.promo-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.promo-row button {
+  width: 64px; height: 64px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--sq-light); cursor: pointer; display: grid; place-items: center;
+}
+.promo-row button:hover { border-color: var(--accent); }
+.promo-row .piece { font-size: 2.4rem; }
+.promo-cancel { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 6px 10px; text-decoration: underline; }
+
+/* side cards */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-width: 0; }
+.status { font-family: var(--font-display); font-size: 1.1rem; font-weight: 600; display: flex; align-items: center; gap: 10px; min-height: 52px; }
+.status .badge { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); flex: none; }
+.status.thinking .badge { animation: pulse 1s ease-in-out infinite; }
+.status.over { border-color: var(--accent); }
+.status.over .badge { background: var(--good); }
+.status .warn { color: var(--danger); }
+@keyframes pulse { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .status.thinking .badge { animation: none; } }
+
+.controls { display: grid; gap: 12px; }
+.row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.row[hidden] { display: none; }
+.lbl { width: 3.2em; color: var(--muted); font-size: .9rem; flex: none; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button {
+  border: 0; background: transparent; padding: 7px 14px; cursor: pointer; min-height: 38px;
+  border-right: 1px solid var(--line);
+}
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.actions button {
+  flex: 1 1 0; min-width: 72px; min-height: 40px; border-radius: 8px; border: 1px solid var(--line);
+  background: transparent; cursor: pointer; font-weight: 500;
+}
+.actions button:hover:not(:disabled) { border-color: var(--accent); }
+.actions button:disabled { opacity: .45; cursor: default; }
+.actions button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+
+.moves h2 { font-family: var(--font-display); font-size: .95rem; margin: 0 0 8px; color: var(--muted); letter-spacing: .06em; }
+.movelist { max-height: 220px; overflow-y: auto; font-variant-numeric: tabular-nums; }
+.mv { display: grid; grid-template-columns: 2.6em 1fr 1fr; padding: 3px 4px; border-radius: 4px; }
+.mv:nth-child(even) { background: color-mix(in srgb, var(--line) 35%, transparent); }
+.mv .no { color: var(--muted); }
+.empty { color: var(--muted); margin: 0; }
+
+/* online play */
+.online { display: grid; gap: 12px; }
+.hint { margin: 0; color: var(--muted); font-size: .9rem; }
+.msg { margin: 0; min-height: 1.3em; color: var(--danger); font-size: .9rem; }
+.field {
+  flex: 1 1 140px; min-width: 0; min-height: 40px; border: 1px solid var(--line); border-radius: 8px;
+  padding: 0 12px; background: transparent; color: var(--fg); font: inherit; letter-spacing: .2em; text-transform: uppercase;
+}
+.field:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.btn {
+  min-height: 40px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line);
+  background: transparent; cursor: pointer; font-weight: 500;
+}
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: default; }
+.codebox { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.code { font-family: var(--font-display); font-size: 1.8rem; font-weight: 700; letter-spacing: .2em; line-height: 1.1; }
+.offer { border: 1px solid var(--accent); border-radius: 8px; padding: 10px; display: grid; gap: 8px; }
+.offer span { font-weight: 600; }
+</style>
+
+<main class="app">
+  <header class="head">
+    <h1>線上西洋棋</h1>
+    <p class="sub">先點選棋子，再點選要走的格子。可對電腦、本機雙人，或和朋友線上對戰。</p>
+  </header>
+  <div class="layout">
+    <section class="boardcol">
+      <div class="player" id="pTop"></div>
+      <div class="board" id="board" role="group" aria-label="棋盤"></div>
+      <div class="player" id="pBot"></div>
+    </section>
+    <aside class="side">
+      <div class="card status" id="status" role="status" aria-live="polite"></div>
+      <section class="card controls" aria-label="設定">
+        <div class="row">
+          <span class="lbl">模式</span>
+          <div class="seg" data-key="mode">
+            <button type="button" data-v="cpu">對電腦</button>
+            <button type="button" data-v="pvp">本機雙人</button>
+            <button type="button" data-v="online">線上</button>
+          </div>
+        </div>
+        <div class="row" id="rowColor">
+          <span class="lbl">我執</span>
+          <div class="seg" data-key="human">
+            <button type="button" data-v="w">白方</button>
+            <button type="button" data-v="b">黑方</button>
+          </div>
+        </div>
+        <div class="row" id="rowLevel">
+          <span class="lbl">難度</span>
+          <div class="seg" data-key="level">
+            <button type="button" data-v="1">簡單</button>
+            <button type="button" data-v="2">普通</button>
+            <button type="button" data-v="3">困難</button>
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" id="btnNew" class="primary">新遊戲</button>
+          <button type="button" id="btnUndo">悔棋</button>
+          <button type="button" id="btnFlip">翻轉</button>
+        </div>
+      </section>
+      <section class="card online" id="onlineCard" aria-label="線上對戰" hidden>
+        <p class="hint" id="olUnavail" hidden></p>
+        <div class="online" id="lobby" hidden>
+          <p class="hint">一人建立房間，把 6 碼代碼給朋友，朋友輸入代碼加入。兩人都需要這個頁面的「貢獻者」以上權限。</p>
+          <p class="hint" id="olRO" hidden>你目前只有檢視權限，只能輸入代碼觀戰，不能建立房間或下棋。</p>
+          <div class="row">
+            <span class="lbl">我執</span>
+            <div class="seg" data-key="createColor">
+              <button type="button" data-v="w">白方</button>
+              <button type="button" data-v="b">黑方</button>
+              <button type="button" data-v="r">隨機</button>
+            </div>
+          </div>
+          <div class="actions"><button type="button" id="btnCreate" class="primary">建立房間</button></div>
+          <div class="row">
+            <input id="joinCode" class="field" maxlength="6" placeholder="房間代碼" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="房間代碼">
+            <button type="button" id="btnJoin" class="btn">加入</button>
+          </div>
+          <div class="actions" id="rowLast" hidden><button type="button" id="btnLast"></button></div>
+          <p class="msg" id="olMsg" role="status"></p>
+        </div>
+        <div class="online" id="roomv" hidden>
+          <div class="codebox">
+            <span class="lbl">房間</span>
+            <span class="code" id="roomCode"></span>
+            <button type="button" class="btn" id="btnCopy">複製代碼</button>
+          </div>
+          <p class="hint" id="roomInfo"></p>
+          <div class="offer" id="offerBox" hidden>
+            <span>對手提出和棋</span>
+            <div class="actions">
+              <button type="button" id="btnAccept" class="primary">同意</button>
+              <button type="button" id="btnDecline">拒絕</button>
+            </div>
+          </div>
+          <div class="actions">
+            <button type="button" id="btnDraw">提和</button>
+            <button type="button" id="btnResign">認輸</button>
+            <button type="button" id="btnRematch" class="primary" hidden>再來一局</button>
+            <button type="button" id="btnLeave">離開房間</button>
+          </div>
+          <p class="msg" id="roomMsg" role="status"></p>
+        </div>
+      </section>
+      <section class="card moves" aria-label="棋譜">
+        <h2>棋譜</h2>
+        <div class="movelist" id="moves"></div>
+      </section>
+    </aside>
+  </div>
+</main>
+
+<script>
+// ==ENGINE-START==
+const FILES = 'abcdefgh';
+const VAL = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 0 };
+const isW = p => p >= 'A' && p <= 'Z';
+
+const PST = {
+  p: [0,0,0,0,0,0,0,0, 50,50,50,50,50,50,50,50, 10,10,20,30,30,20,10,10, 5,5,10,25,25,10,5,5, 0,0,0,20,20,0,0,0, 5,-5,-10,0,0,-10,-5,5, 5,10,10,-20,-20,10,10,5, 0,0,0,0,0,0,0,0],
+  n: [-50,-40,-30,-30,-30,-30,-40,-50, -40,-20,0,0,0,0,-20,-40, -30,0,10,15,15,10,0,-30, -30,5,15,20,20,15,5,-30, -30,0,15,20,20,15,0,-30, -30,5,10,15,15,10,5,-30, -40,-20,0,5,5,0,-20,-40, -50,-40,-30,-30,-30,-30,-40,-50],
+  b: [-20,-10,-10,-10,-10,-10,-10,-20, -10,0,0,0,0,0,0,-10, -10,0,5,10,10,5,0,-10, -10,5,5,10,10,5,5,-10, -10,0,10,10,10,10,0,-10, -10,10,10,10,10,10,10,-10, -10,5,0,0,0,0,5,-10, -20,-10,-10,-10,-10,-10,-10,-20],
+  r: [0,0,0,0,0,0,0,0, 5,10,10,10,10,10,10,5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, 0,0,0,5,5,0,0,0],
+  q: [-20,-10,-10,-5,-5,-10,-10,-20, -10,0,0,0,0,0,0,-10, -10,0,5,5,5,5,0,-10, -5,0,5,5,5,5,0,-5, 0,0,5,5,5,5,0,-5, -10,5,5,5,5,5,0,-10, -10,0,5,0,0,0,0,-10, -20,-10,-10,-5,-5,-10,-10,-20],
+  k: [-30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -20,-30,-30,-40,-40,-30,-30,-20, -10,-20,-20,-20,-20,-20,-20,-10, 20,20,0,0,0,0,20,20, 20,30,10,0,0,10,30,20]
+};
+
+const KN = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+const KG = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+const DB = [[-1,-1],[-1,1],[1,-1],[1,1]];
+const DR = [[-1,0],[1,0],[0,-1],[0,1]];
+
+function initialBoard() {
+  const b = new Array(64).fill('');
+  const back = 'rnbqkbnr';
+  for (let i = 0; i < 8; i++) {
+    b[i] = back[i];
+    b[8 + i] = 'p';
+    b[48 + i] = 'P';
+    b[56 + i] = back[i].toUpperCase();
+  }
+  return b;
+}
+function newState() {
+  return { b: initialBoard(), turn: 'w', castle: { K: true, Q: true, k: true, q: true }, ep: -1, half: 0, full: 1 };
+}
+function cloneState(s) {
+  return { b: s.b.slice(), turn: s.turn, castle: { ...s.castle }, ep: s.ep, half: s.half, full: s.full };
+}
+function sqName(i) { return FILES[i & 7] + (8 - (i >> 3)); }
+
+function isAttacked(b, sq, byWhite) {
+  const r = sq >> 3, c = sq & 7;
+  const pr = byWhite ? r + 1 : r - 1;
+  const pawn = byWhite ? 'P' : 'p';
+  if (pr >= 0 && pr < 8) {
+    if (c > 0 && b[pr * 8 + c - 1] === pawn) return true;
+    if (c < 7 && b[pr * 8 + c + 1] === pawn) return true;
+  }
+  const kn = byWhite ? 'N' : 'n';
+  for (const [dr, dc] of KN) {
+    const rr = r + dr, cc = c + dc;
+    if (rr >= 0 && rr < 8 && cc >= 0 && cc < 8 && b[rr * 8 + cc] === kn) return true;
+  }
+  const kg = byWhite ? 'K' : 'k';
+  for (const [dr, dc] of KG) {
+    const rr = r + dr, cc = c + dc;
+    if (rr >= 0 && rr < 8 && cc >= 0 && cc < 8 && b[rr * 8 + cc] === kg) return true;
+  }
+  const bi = byWhite ? 'B' : 'b', ro = byWhite ? 'R' : 'r', qu = byWhite ? 'Q' : 'q';
+  for (const [dr, dc] of DB) {
+    let rr = r + dr, cc = c + dc;
+    while (rr >= 0 && rr < 8 && cc >= 0 && cc < 8) {
+      const p = b[rr * 8 + cc];
+      if (p) { if (p === bi || p === qu) return true; break; }
+      rr += dr; cc += dc;
+    }
+  }
+  for (const [dr, dc] of DR) {
+    let rr = r + dr, cc = c + dc;
+    while (rr >= 0 && rr < 8 && cc >= 0 && cc < 8) {
+      const p = b[rr * 8 + cc];
+      if (p) { if (p === ro || p === qu) return true; break; }
+      rr += dr; cc += dc;
+    }
+  }
+  return false;
+}
+function findKing(b, white) {
+  const k = white ? 'K' : 'k';
+  for (let i = 0; i < 64; i++) if (b[i] === k) return i;
+  return -1;
+}
+function inCheck(s, white) {
+  const k = findKing(s.b, white);
+  return k < 0 ? false : isAttacked(s.b, k, !white);
+}
+
+function pseudo(s) {
+  const moves = [];
+  const b = s.b;
+  const white = s.turn === 'w';
+  for (let i = 0; i < 64; i++) {
+    const p = b[i];
+    if (!p || isW(p) !== white) continue;
+    const t = p.toLowerCase();
+    const r = i >> 3, c = i & 7;
+    if (t === 'p') {
+      const dir = white ? -1 : 1, startR = white ? 6 : 1, promoR = white ? 0 : 7;
+      const r1 = r + dir;
+      const addPawn = (to) => {
+        if ((to >> 3) === promoR) {
+          for (const pr of ['q', 'r', 'b', 'n']) moves.push({ from: i, to, promo: pr });
+        } else moves.push({ from: i, to });
+      };
+      if (r1 >= 0 && r1 < 8) {
+        if (!b[r1 * 8 + c]) {
+          addPawn(r1 * 8 + c);
+          if (r === startR && !b[(r + 2 * dir) * 8 + c]) moves.push({ from: i, to: (r + 2 * dir) * 8 + c, double: true });
+        }
+        for (const dc of [-1, 1]) {
+          const cc = c + dc;
+          if (cc < 0 || cc > 7) continue;
+          const to = r1 * 8 + cc, tp = b[to];
+          if (tp && isW(tp) !== white) addPawn(to);
+          else if (!tp && to === s.ep) moves.push({ from: i, to, ep: true });
+        }
+      }
+    } else if (t === 'n' || t === 'k') {
+      for (const [dr, dc] of (t === 'n' ? KN : KG)) {
+        const rr = r + dr, cc = c + dc;
+        if (rr < 0 || rr > 7 || cc < 0 || cc > 7) continue;
+        const to = rr * 8 + cc, tp = b[to];
+        if (!tp || isW(tp) !== white) moves.push({ from: i, to });
+      }
+      if (t === 'k') {
+        const ca = s.castle;
+        if (white && i === 60) {
+          if (ca.K && b[63] === 'R' && !b[61] && !b[62] && !isAttacked(b, 60, false) && !isAttacked(b, 61, false) && !isAttacked(b, 62, false)) moves.push({ from: 60, to: 62, castle: true });
+          if (ca.Q && b[56] === 'R' && !b[57] && !b[58] && !b[59] && !isAttacked(b, 60, false) && !isAttacked(b, 59, false) && !isAttacked(b, 58, false)) moves.push({ from: 60, to: 58, castle: true });
+        } else if (!white && i === 4) {
+          if (ca.k && b[7] === 'r' && !b[5] && !b[6] && !isAttacked(b, 4, true) && !isAttacked(b, 5, true) && !isAttacked(b, 6, true)) moves.push({ from: 4, to: 6, castle: true });
+          if (ca.q && b[0] === 'r' && !b[1] && !b[2] && !b[3] && !isAttacked(b, 4, true) && !isAttacked(b, 3, true) && !isAttacked(b, 2, true)) moves.push({ from: 4, to: 2, castle: true });
+        }
+      }
+    } else {
+      const dirs = t === 'b' ? DB : t === 'r' ? DR : DB.concat(DR);
+      for (const [dr, dc] of dirs) {
+        let rr = r + dr, cc = c + dc;
+        while (rr >= 0 && rr < 8 && cc >= 0 && cc < 8) {
+          const to = rr * 8 + cc, tp = b[to];
+          if (!tp) moves.push({ from: i, to });
+          else { if (isW(tp) !== white) moves.push({ from: i, to }); break; }
+          rr += dr; cc += dc;
+        }
+      }
+    }
+  }
+  return moves;
+}
+
+function make(s, m) {
+  const u = { castle: { ...s.castle }, ep: s.ep, half: s.half };
+  const b = s.b;
+  const p = b[m.from];
+  const white = isW(p);
+  if (m.ep) {
+    u.capSq = m.to + (white ? 8 : -8);
+    u.captured = b[u.capSq];
+    b[u.capSq] = '';
+  } else {
+    u.capSq = m.to;
+    u.captured = b[m.to];
+  }
+  b[m.to] = m.promo ? (white ? m.promo.toUpperCase() : m.promo) : p;
+  b[m.from] = '';
+  if (m.castle) {
+    if (m.to > m.from) { b[m.from + 1] = b[m.from + 3]; b[m.from + 3] = ''; }
+    else { b[m.from - 1] = b[m.from - 4]; b[m.from - 4] = ''; }
+  }
+  const c = s.castle;
+  if (p === 'K') { c.K = false; c.Q = false; }
+  else if (p === 'k') { c.k = false; c.q = false; }
+  if (m.from === 63 || m.to === 63) c.K = false;
+  if (m.from === 56 || m.to === 56) c.Q = false;
+  if (m.from === 7 || m.to === 7) c.k = false;
+  if (m.from === 0 || m.to === 0) c.q = false;
+  s.ep = m.double ? (m.from + m.to) / 2 : -1;
+  s.half = (p.toLowerCase() === 'p' || u.captured) ? 0 : s.half + 1;
+  if (!white) s.full++;
+  s.turn = white ? 'b' : 'w';
+  return u;
+}
+function unmake(s, m, u) {
+  const b = s.b;
+  s.turn = s.turn === 'w' ? 'b' : 'w';
+  const white = s.turn === 'w';
+  const p = m.promo ? (white ? 'P' : 'p') : b[m.to];
+  b[m.from] = p;
+  b[m.to] = '';
+  if (m.ep) b[u.capSq] = u.captured;
+  else b[m.to] = u.captured || '';
+  if (m.castle) {
+    if (m.to > m.from) { b[m.from + 3] = b[m.from + 1]; b[m.from + 1] = ''; }
+    else { b[m.from - 4] = b[m.from - 1]; b[m.from - 1] = ''; }
+  }
+  s.castle = u.castle; s.ep = u.ep; s.half = u.half;
+  if (!white) s.full--;
+}
+function legal(s) {
+  const white = s.turn === 'w';
+  const out = [];
+  for (const m of pseudo(s)) {
+    const u = make(s, m);
+    if (!inCheck(s, white)) out.push(m);
+    unmake(s, m, u);
+  }
+  return out;
+}
+
+// --- computer player ---
+const INF = 1e9, MATE = 100000;
+const TIMEOUT = { timeout: true };
+let nodes = 0, checkAt = 2048, deadline = 0;
+
+function evaluate(s) {
+  let sc = 0;
+  for (let i = 0; i < 64; i++) {
+    const p = s.b[i];
+    if (!p) continue;
+    const t = p.toLowerCase();
+    const w = isW(p);
+    const v = VAL[t] + PST[t][w ? i : i ^ 56];
+    sc += w ? v : -v;
+  }
+  return s.turn === 'w' ? sc : -sc;
+}
+function orderMoves(s, moves) {
+  const b = s.b;
+  const sc = moves.map(m => {
+    let v = 0;
+    const cp = b[m.to];
+    if (cp) v = 1000 + 10 * VAL[cp.toLowerCase()] - VAL[b[m.from].toLowerCase()] / 10;
+    else if (m.ep) v = 1990;
+    if (m.promo) v += 800 + VAL[m.promo];
+    return v;
+  });
+  return moves.map((_, i) => i).sort((x, y) => sc[y] - sc[x]).map(i => moves[i]);
+}
+function tick() {
+  if (++nodes > checkAt) {
+    checkAt = nodes + 2048;
+    if (performance.now() > deadline) throw TIMEOUT;
+  }
+}
+function qsearch(s, alpha, beta, depth) {
+  tick();
+  const stand = evaluate(s);
+  if (stand >= beta) return beta;
+  if (stand > alpha) alpha = stand;
+  if (depth <= 0) return alpha;
+  const white = s.turn === 'w';
+  const caps = pseudo(s).filter(m => s.b[m.to] || m.ep || m.promo);
+  for (const m of orderMoves(s, caps)) {
+    const u = make(s, m);
+    if (inCheck(s, white)) { unmake(s, m, u); continue; }
+    const sc = -qsearch(s, -beta, -alpha, depth - 1);
+    unmake(s, m, u);
+    if (sc >= beta) return beta;
+    if (sc > alpha) alpha = sc;
+  }
+  return alpha;
+}
+function search(s, depth, alpha, beta, ply) {
+  tick();
+  const white = s.turn === 'w';
+  if (depth <= 0) {
+    if (ply < 10 && inCheck(s, white)) depth = 1;
+    else return qsearch(s, alpha, beta, 6);
+  }
+  const moves = legal(s);
+  if (!moves.length) return inCheck(s, white) ? -MATE + ply : 0;
+  for (const m of orderMoves(s, moves)) {
+    const u = make(s, m);
+    const sc = -search(s, depth - 1, -beta, -alpha, ply + 1);
+    unmake(s, m, u);
+    if (sc >= beta) return beta;
+    if (sc > alpha) alpha = sc;
+  }
+  return alpha;
+}
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function findBest(s0, maxDepth, ms, noise) {
+  const s = cloneState(s0);
+  let moves = legal(s);
+  if (!moves.length) return null;
+  if (moves.length === 1) return moves[0];
+  shuffle(moves);
+  nodes = 0; checkAt = 2048; deadline = performance.now() + ms;
+  let best = moves[0];
+  try {
+    if (noise > 0) {
+      let bs = -INF;
+      for (const m of moves) {
+        const u = make(s, m);
+        const sc = -search(s, maxDepth - 1, -INF, INF, 1) + (Math.random() * 2 - 1) * noise;
+        unmake(s, m, u);
+        if (sc > bs) { bs = sc; best = m; }
+      }
+      return best;
+    }
+    for (let d = 1; d <= maxDepth; d++) {
+      let alpha = -INF, cur = null;
+      let ordered = orderMoves(s, moves);
+      ordered = [best, ...ordered.filter(m => m !== best)];
+      for (const m of ordered) {
+        const u = make(s, m);
+        const sc = -search(s, d - 1, -INF, -alpha, 1);
+        unmake(s, m, u);
+        if (sc > alpha) { alpha = sc; cur = m; }
+      }
+      if (cur) best = cur;
+      if (alpha > MATE - 50) break;
+    }
+  } catch (e) {
+    if (e !== TIMEOUT) throw e;
+  }
+  return best;
+}
+// ==ENGINE-END==
+
+// --- game + interface ---
+(function () {
+  const GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟︎' };
+  const NAMES = { k: '王', q: '后', r: '車', b: '象', n: '馬', p: '兵' };
+  const LEVEL_NAMES = { 1: '簡單', 2: '普通', 3: '困難' };
+  const LEVELS = {
+    1: { depth: 1, ms: 600, noise: 140 },
+    2: { depth: 3, ms: 900, noise: 0 },
+    3: { depth: 5, ms: 2600, noise: 0 }
+  };
+  const HASH_RE = /^#room-([A-Za-z0-9]{6})$/;
+  const CODE_RE = /^[A-HJ-NP-Z2-9]{6}$/;
+  const ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const LAST_KEY = 'chess-last-room';
+
+  const $ = id => document.getElementById(id);
+  const boardEl = $('board'), statusEl = $('status'), movesEl = $('moves');
+  const pTop = $('pTop'), pBot = $('pBot');
+
+  const settings = { mode: 'cpu', human: 'w', level: 2, createColor: 'w' };
+  let state, hist, keys, legalMoves, sel, lastMove, result, thinking, flipped, promoMoves, aiToken = 0;
+
+  // online play
+  let capsState = 'loading';       // loading | ready | none
+  let dbApi = null, userApi = null, myId = null, canWrite = false;
+  let online = null;               // the room this view is in, or null
+  let wantRoom = null;             // room code to open once capabilities answer
+  let queue = Promise.resolve();   // one write at a time per game document
+
+  function posKey(s) {
+    return s.b.map(p => p || '.').join('') + s.turn +
+      (s.castle.K ? 'K' : '') + (s.castle.Q ? 'Q' : '') + (s.castle.k ? 'k' : '') + (s.castle.q ? 'q' : '') + s.ep;
+  }
+  function insufficient() {
+    const rest = state.b.filter(p => p && p.toLowerCase() !== 'k');
+    if (!rest.length) return true;
+    return rest.length === 1 && 'nb'.includes(rest[0].toLowerCase());
+  }
+  function updateResult(chk) {
+    result = null;
+    const white = state.turn === 'w';
+    if (!legalMoves.length) result = chk ? { type: 'mate', winner: white ? 'b' : 'w' } : { type: 'stalemate' };
+    else if (state.half >= 100) result = { type: 'fifty' };
+    else if (keys.filter(k => k === keys[keys.length - 1]).length >= 3) result = { type: 'rep' };
+    else if (insufficient()) result = { type: 'mat' };
+    if (!result && online && online.data && online.data.over) {
+      const o = online.data.over;
+      result = o.type === 'resign' ? { type: 'resign', winner: o.winner } : { type: 'agreed' };
+    }
+  }
+  function baseSAN(m) {
+    const p = state.b[m.from], t = p.toLowerCase();
+    if (m.castle) return m.to > m.from ? 'O-O' : 'O-O-O';
+    const cap = state.b[m.to] || m.ep;
+    let s = '';
+    if (t === 'p') {
+      if (cap) s += FILES[m.from & 7] + 'x';
+      s += sqName(m.to);
+      if (m.promo) s += '=' + m.promo.toUpperCase();
+      return s;
+    }
+    s += t.toUpperCase();
+    const others = legalMoves.filter(o => o !== m && state.b[o.from] === p && o.to === m.to);
+    if (others.length) {
+      const sameFile = others.some(o => (o.from & 7) === (m.from & 7));
+      const sameRank = others.some(o => (o.from >> 3) === (m.from >> 3));
+      if (!sameFile) s += FILES[m.from & 7];
+      else if (!sameRank) s += (8 - (m.from >> 3));
+      else s += sqName(m.from);
+    }
+    if (cap) s += 'x';
+    return s + sqName(m.to);
+  }
+  function applyMove(m) {
+    let san = baseSAN(m);
+    const u = make(state, m);
+    keys.push(posKey(state));
+    legalMoves = legal(state);
+    const chk = inCheck(state, state.turn === 'w');
+    updateResult(chk);
+    if (chk) san += legalMoves.length ? '+' : '#';
+    hist.push({ m, u, san });
+    lastMove = m; sel = null; promoMoves = null;
+  }
+  function resetState() {
+    state = newState();
+    hist = []; keys = [posKey(state)]; sel = null; lastMove = null; result = null;
+    thinking = false; promoMoves = null; aiToken++;
+    legalMoves = legal(state);
+  }
+  function replay(moves) {
+    resetState();
+    for (const mv of moves) {
+      const m = legalMoves.find(x => x.from === mv.f && x.to === mv.t && x.promo === (mv.p || undefined));
+      if (!m) break;
+      applyMove(m);
+    }
+    updateResult(inCheck(state, state.turn === 'w'));
+    return hist.length === moves.length;
+  }
+  function newGame() {
+    resetState();
+    flipped = settings.mode === 'cpu' && settings.human === 'b';
+    render();
+    maybeAI();
+  }
+  function humanTurn() {
+    if (settings.mode === 'pvp') return true;
+    if (settings.mode === 'online') {
+      return !!(online && online.ready && !online.bad && online.myColor && state.turn === online.myColor &&
+        online.data.white && online.data.black && !result);
+    }
+    return state.turn === settings.human;
+  }
+
+  function doMove(m) {
+    applyMove(m);
+    render();
+    if (settings.mode === 'online') pushMove();
+    else maybeAI();
+  }
+  function maybeAI() {
+    if (result || settings.mode !== 'cpu' || state.turn === settings.human) return;
+    thinking = true;
+    renderStatus();
+    renderButtons();
+    const token = ++aiToken;
+    setTimeout(() => {
+      if (token !== aiToken) return;
+      const lv = LEVELS[settings.level];
+      const pick = findBest(state, lv.depth, lv.ms, lv.noise);
+      if (token !== aiToken) return;
+      thinking = false;
+      if (pick) {
+        const m = legalMoves.find(x => x.from === pick.from && x.to === pick.to && x.promo === pick.promo);
+        doMove(m || legalMoves[0]);
+      } else render();
+    }, 60);
+  }
+  function undo() {
+    if (thinking || !hist.length || settings.mode === 'online') return;
+    const popOne = () => { const h = hist.pop(); keys.pop(); unmake(state, h.m, h.u); };
+    popOne();
+    if (settings.mode === 'cpu' && state.turn !== settings.human && hist.length) popOne();
+    legalMoves = legal(state);
+    lastMove = hist.length ? hist[hist.length - 1].m : null;
+    sel = null; promoMoves = null;
+    updateResult(inCheck(state, state.turn === 'w'));
+    render();
+    maybeAI();
+  }
+
+  function onSquare(i) {
+    if (result || thinking || promoMoves || !humanTurn()) return;
+    if (sel !== null) {
+      const ms = legalMoves.filter(m => m.from === sel && m.to === i);
+      if (ms.length) {
+        if (ms.length > 1) { promoMoves = ms; renderBoard(); return; }
+        doMove(ms[0]);
+        return;
+      }
+    }
+    const p = state.b[i];
+    if (p && isW(p) === (state.turn === 'w')) sel = sel === i ? null : i;
+    else sel = null;
+    renderBoard();
+  }
+
+  // --- online play ---
+  function note(t) { $('olMsg').textContent = t || ''; $('roomMsg').textContent = t || ''; }
+  function getLast() { try { const v = localStorage.getItem(LAST_KEY); return CODE_RE.test(v || '') ? v : ''; } catch (e) { return ''; } }
+  function setLast(c) { try { localStorage.setItem(LAST_KEY, c); } catch (e) { /* storage unavailable */ } }
+  function setHash(h) { try { if (location.hash !== h) location.hash = h; } catch (e) { /* ignore */ } }
+  function randCode() {
+    const a = new Uint32Array(6);
+    crypto.getRandomValues(a);
+    return Array.from(a, n => ALPHA[n % ALPHA.length]).join('');
+  }
+  function write(patch, onFail) {
+    const o = online;
+    if (!o) return;
+    queue = queue.then(() => o.ref.update(patch)).catch(e => {
+      if (onFail) onFail(e); else note('操作沒有成功，請再試一次。');
+    });
+  }
+  function pushMove() {
+    if (!online) return;
+    const moves = hist.map(h => ({ f: h.m.from, t: h.m.to, p: h.m.promo || '' }));
+    write({ moves, updated: Date.now(), drawOffer: null }, () => {
+      note('走法沒有送出，已回到對局的最新狀態。');
+      if (online && online.data) { replay(online.data.moves || []); render(); }
+    });
+  }
+  async function claimSeat(o) {
+    try {
+      let r = await o.ref.acquire({ holder: myId, ttlMs: 5000 });
+      if (!r.acquired) {
+        await new Promise(res => setTimeout(res, 1300));
+        r = await o.ref.acquire({ holder: myId, ttlMs: 5000 });
+        if (!r.acquired) return;
+      }
+      const snap = await o.ref.get();
+      const d = snap.data();
+      if (!d || d.white === myId || d.black === myId) return;
+      const seat = !d.white ? 'white' : (!d.black ? 'black' : null);
+      if (seat) await o.ref.update({ [seat]: myId, updated: Date.now() });
+    } catch (e) {
+      note('加入對局失敗，目前以觀戰方式進入。');
+    }
+  }
+  async function loadNames(o) {
+    if (!userApi || online !== o || !o.data) return;
+    const ids = [o.data.white, o.data.black].filter(Boolean);
+    const key = ids.join('|');
+    if (key === o.nameKey) return;
+    o.nameKey = key;
+    try {
+      const ps = await userApi.profiles(ids);
+      if (online !== o) return;
+      o.names = {};
+      for (const id of ids) o.names[id] = (ps[id] && ps[id].name) || '';
+      renderPlayers();
+      renderOnline();
+    } catch (e) { /* names stay generic */ }
+  }
+  function onRoomSnap(o, snap) {
+    if (online !== o) return;
+    if (!snap.exists) {
+      if (snap.metadata && snap.metadata.fromCache) return;
+      const c = o.code;
+      exitRoom();
+      note('找不到房間 ' + c + '，請確認代碼。');
+      return;
+    }
+    const d = snap.data();
+    o.data = d;
+    if (!snap.metadata.fromCache && !o.ready) {
+      o.ready = true;
+      clearTimeout(o.timer);
+    }
+    o.myColor = d.white === myId ? 'w' : (d.black === myId ? 'b' : null);
+    const mv = d.moves || [];
+    const same = mv.length === hist.length &&
+      mv.every((x, i) => x.f === hist[i].m.from && x.t === hist[i].m.to && (x.p || undefined) === hist[i].m.promo);
+    if (!same) o.bad = !replay(mv);
+    else updateResult(inCheck(state, state.turn === 'w'));
+    const key = (o.myColor || '') + ':' + (d.round || 0);
+    if (o.flipKey !== key) {
+      o.flipKey = key;
+      if (o.myColor) flipped = o.myColor === 'b';
+    }
+    if (o.ready && o.claim && !o.myColor && (!d.white || !d.black)) {
+      o.claim = false;
+      claimSeat(o);
+    }
+    render();
+    loadNames(o);
+  }
+  function enterRoom(code, opts) {
+    code = String(code || '').trim().toUpperCase();
+    if (!CODE_RE.test(code)) { note('房間代碼是 6 個字母或數字。'); return; }
+    if (!dbApi || !myId) return;
+    leaveRoom();
+    note('');
+    resetState();
+    flipped = false;
+    const o = {
+      code, ref: dbApi.doc('games/' + code), data: null, myColor: null, ready: false, bad: false,
+      claim: !!(opts && opts.claim) && canWrite, names: {}, nameKey: '', flipKey: '', confirmResign: false
+    };
+    online = o;
+    o.timer = setTimeout(() => {
+      if (online === o && !o.ready) note('連線比較久，資料可能不是最新的。');
+    }, 10000);
+    try {
+      o.unsub = o.ref.onSnapshot(snap => onRoomSnap(o, snap), err => {
+        if (online !== o) return;
+        note('和房間的連線中斷了（' + (err && err.code ? err.code : 'error') + '）。');
+        render();
+      });
+    } catch (e) {
+      online = null;
+      note('無法連線到房間。');
+    }
+    setLast(code);
+    setHash('#room-' + code);
+    render();
+  }
+  function leaveRoom() {
+    if (online) {
+      try { if (online.unsub) online.unsub(); } catch (e) { /* ignore */ }
+      clearTimeout(online.timer);
+      clearTimeout(online.crT);
+    }
+    online = null;
+    queue = Promise.resolve();
+  }
+  function exitRoom() {
+    leaveRoom();
+    resetState();
+    flipped = false;
+    try { if (HASH_RE.test(location.hash)) location.hash = ''; } catch (e) { /* ignore */ }
+    render();
+  }
+  async function createRoom() {
+    if (!dbApi || !myId || !canWrite) return;
+    note('');
+    let c = settings.createColor;
+    if (c === 'r') c = Math.random() < 0.5 ? 'w' : 'b';
+    $('btnCreate').disabled = true;
+    try {
+      let code, ref, tries = 0;
+      for (;;) {
+        code = randCode();
+        ref = dbApi.doc('games/' + code);
+        const s = await ref.get();
+        if (!s.exists || ++tries >= 5) break;
+      }
+      await ref.set({
+        white: c === 'w' ? myId : null, black: c === 'b' ? myId : null,
+        moves: [], over: null, drawOffer: null, round: 0, created: Date.now(), updated: Date.now()
+      });
+      enterRoom(code, { claim: false });
+    } catch (e) {
+      note('建立房間失敗，請稍後再試。');
+    }
+    renderOnline();
+  }
+  function joinRoom() {
+    const v = $('joinCode').value.trim().toUpperCase();
+    if (!CODE_RE.test(v)) { note('房間代碼是 6 個字母或數字。'); return; }
+    enterRoom(v, { claim: true });
+  }
+
+  // --- rendering ---
+  function renderBoard() {
+    const frag = document.createDocumentFragment();
+    const white = state.turn === 'w';
+    const chk = inCheck(state, white);
+    const kingSq = chk ? findKing(state.b, white) : -1;
+    const targets = new Map();
+    if (sel !== null) legalMoves.filter(m => m.from === sel).forEach(m => targets.set(m.to, m));
+    for (let vr = 0; vr < 8; vr++) {
+      for (let vc = 0; vc < 8; vc++) {
+        const r = flipped ? 7 - vr : vr, c = flipped ? 7 - vc : vc, i = r * 8 + c;
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.dataset.sq = i;
+        let cls = 'sq ' + (((r + c) & 1) ? 'dark' : 'light');
+        if (lastMove && (i === lastMove.from || i === lastMove.to)) cls += ' last';
+        if (lastMove && i === lastMove.to) cls += ' landed';
+        if (i === sel) cls += ' sel';
+        if (i === kingSq) cls += ' check';
+        el.className = cls;
+        if (vc === 0) el.dataset.rank = 8 - r;
+        if (vr === 7) el.dataset.file = FILES[c];
+        const p = state.b[i];
+        el.setAttribute('aria-label', sqName(i) + (p ? ' ' + (isW(p) ? '白' : '黑') + NAMES[p.toLowerCase()] : ' 空格'));
+        if (p) {
+          const sp = document.createElement('span');
+          sp.className = 'piece ' + (isW(p) ? 'w' : 'b');
+          sp.textContent = GLYPH[p.toLowerCase()];
+          el.appendChild(sp);
+        }
+        if (targets.has(i)) {
+          const d = document.createElement('span');
+          d.className = 'dot' + ((p || targets.get(i).ep) ? ' cap' : '');
+          el.appendChild(d);
+        }
+        frag.appendChild(el);
+      }
+    }
+    boardEl.replaceChildren(frag);
+    if (promoMoves) boardEl.appendChild(buildPromo());
+  }
+  function buildPromo() {
+    const wrap = document.createElement('div');
+    wrap.className = 'promo';
+    const box = document.createElement('div');
+    box.className = 'promo-box';
+    const t = document.createElement('p');
+    t.textContent = '兵升變為：';
+    const row = document.createElement('div');
+    row.className = 'promo-row';
+    const color = state.turn === 'w' ? 'w' : 'b';
+    for (const v of ['q', 'r', 'b', 'n']) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.setAttribute('aria-label', NAMES[v]);
+      btn.innerHTML = '<span class="piece ' + color + '">' + GLYPH[v] + '</span>';
+      btn.addEventListener('click', () => {
+        const m = promoMoves.find(x => x.promo === v);
+        promoMoves = null;
+        doMove(m);
+      });
+      row.appendChild(btn);
+    }
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'promo-cancel';
+    cancel.textContent = '取消';
+    cancel.addEventListener('click', () => { promoMoves = null; sel = null; renderBoard(); });
+    box.append(t, row, cancel);
+    wrap.appendChild(box);
+    return wrap;
+  }
+  function label(color) {
+    const nm = color === 'w' ? '白方' : '黑方';
+    if (settings.mode === 'pvp') return nm;
+    if (settings.mode === 'online') {
+      if (!online || !online.data) return nm;
+      if (online.myColor === color) return '你（' + nm + '）';
+      const id = online.data[color === 'w' ? 'white' : 'black'];
+      if (!id) return nm + '（空位）';
+      const n = online.names && online.names[id];
+      return (n || (online.myColor ? '對手' : nm)) + (n || online.myColor ? '（' + nm + '）' : '');
+    }
+    return color === settings.human
+      ? '你（' + nm + '）'
+      : '電腦（' + LEVEL_NAMES[settings.level] + '）';
+  }
+  function captured() {
+    const byW = [], byB = [];
+    for (const h of hist) {
+      const cp = h.u.captured;
+      if (!cp) continue;
+      (isW(cp) ? byB : byW).push(cp.toLowerCase());
+    }
+    const sort = a => a.sort((x, y) => VAL[y] - VAL[x]);
+    return { w: sort(byW), b: sort(byB) };
+  }
+  function renderPlayers() {
+    const cp = captured();
+    const sum = a => a.reduce((t, x) => t + VAL[x], 0);
+    const diffW = Math.round((sum(cp.w) - sum(cp.b)) / 100);
+    const bottom = flipped ? 'b' : 'w', top = flipped ? 'w' : 'b';
+    const fill = (el, color) => {
+      const adv = color === 'w' ? diffW : -diffW;
+      el.className = 'player' + (!result && state.turn === color ? ' active' : '');
+      const opp = color === 'w' ? 'b' : 'w';
+      el.innerHTML =
+        '<span class="chip ' + color + '"></span><span class="pname"></span>' +
+        '<span class="caps">' + cp[color].map(t => '<span class="piece ' + opp + '">' + GLYPH[t] + '</span>').join('') + '</span>' +
+        '<span class="adv">' + (adv > 0 ? '+' + adv : '') + '</span>';
+      el.querySelector('.pname').textContent = label(color);
+    };
+    fill(pTop, top);
+    fill(pBot, bottom);
+  }
+  function resultText() {
+    const r = result;
+    const side = c => (c === 'w' ? '白' : '黑') + '方';
+    const mine = settings.mode === 'online' && online ? online.myColor : null;
+    if (r.type === 'mate') {
+      if (settings.mode === 'cpu') return settings.human === r.winner ? '將死！你贏了' : '將死，電腦獲勝';
+      if (mine) return mine === r.winner ? '將死！你贏了' : '將死，對手獲勝';
+      return '將死！' + side(r.winner) + '獲勝';
+    }
+    if (r.type === 'resign') {
+      if (mine) return mine === r.winner ? '對手認輸，你贏了' : '你已認輸';
+      return side(r.winner) + '獲勝（對手認輸）';
+    }
+    const why = {
+      stalemate: '逼和，無子可動', fifty: '五十步內無吃子或動兵', rep: '同一局面出現三次',
+      mat: '雙方子力不足以將死', agreed: '雙方同意'
+    }[r.type];
+    return '和局：' + why;
+  }
+  function renderStatus() {
+    let cls = 'card status', txt = '', warn = false;
+    const white = state.turn === 'w';
+    if (result) {
+      cls += ' over';
+      txt = resultText();
+    } else if (settings.mode === 'online') {
+      if (!online) txt = '建立或加入房間，開始線上對戰';
+      else if (!online.ready) txt = '連線中…';
+      else if (online.bad) txt = '對局資料異常，無法繼續';
+      else {
+        const d = online.data;
+        if (!d.white || !d.black) txt = '等待對手加入…';
+        else if (!online.myColor) txt = '觀戰中：輪到' + (white ? '白' : '黑') + '方';
+        else txt = state.turn === online.myColor ? '輪到你（' + (white ? '白' : '黑') + '方）' : '等待對手走棋…';
+        warn = inCheck(state, white);
+      }
+    } else {
+      if (thinking) { cls += ' thinking'; txt = '電腦思考中…'; }
+      else if (settings.mode === 'cpu') txt = '輪到你（' + (white ? '白' : '黑') + '方）';
+      else txt = '輪到' + (white ? '白' : '黑') + '方';
+      warn = inCheck(state, white);
+    }
+    statusEl.className = cls;
+    statusEl.innerHTML = '<span class="badge"></span><span></span>';
+    statusEl.lastChild.textContent = txt;
+    if (warn) {
+      const w = document.createElement('span');
+      w.className = 'warn';
+      w.textContent = '將軍！';
+      statusEl.appendChild(w);
+    }
+  }
+  function renderMoves() {
+    if (!hist.length) { movesEl.innerHTML = '<p class="empty">尚未走子，白方先行。</p>'; return; }
+    let html = '';
+    for (let i = 0; i < hist.length; i += 2) {
+      html += '<div class="mv"><span class="no">' + (i / 2 + 1) + '.</span><span>' + hist[i].san + '</span><span>' + (hist[i + 1] ? hist[i + 1].san : '') + '</span></div>';
+    }
+    movesEl.innerHTML = html;
+    movesEl.scrollTop = movesEl.scrollHeight;
+  }
+  function renderButtons() {
+    document.querySelectorAll('.seg').forEach(seg => {
+      const key = seg.dataset.key;
+      seg.querySelectorAll('button').forEach(b => {
+        b.setAttribute('aria-pressed', String(String(settings[key]) === b.dataset.v));
+      });
+    });
+    const cpu = settings.mode === 'cpu', on = settings.mode === 'online';
+    $('rowColor').hidden = !cpu;
+    $('rowLevel').hidden = !cpu;
+    $('btnNew').hidden = on;
+    $('btnUndo').hidden = on;
+    $('btnUndo').disabled = thinking || !hist.length;
+  }
+  function renderOnline() {
+    const on = settings.mode === 'online';
+    $('onlineCard').hidden = !on;
+    if (!on) return;
+    const ready = capsState === 'ready';
+    const un = $('olUnavail');
+    un.hidden = ready;
+    if (!ready) {
+      un.textContent = capsState === 'loading'
+        ? '連線中…'
+        : '目前無法使用線上對戰。請登入 claude.ai 後開啟這個頁面，並請頁面擁有者把頁面分享給你，權限需為「貢獻者」以上。';
+    }
+    $('lobby').hidden = !ready || !!online;
+    $('roomv').hidden = !ready || !online;
+    $('olRO').hidden = !(ready && !canWrite);
+    $('btnCreate').disabled = !canWrite;
+    const last = getLast();
+    $('rowLast').hidden = !last;
+    if (last) $('btnLast').textContent = '回到房間 ' + last;
+    if (!online) return;
+    const o = online, d = o.data;
+    $('roomCode').textContent = o.code;
+    let info = '連線中…';
+    if (o.ready && d) {
+      if (o.myColor) {
+        const oppId = d[o.myColor === 'w' ? 'black' : 'white'];
+        const oppName = oppId ? (o.names[oppId] || '已加入') : '尚未加入，請把代碼給對方';
+        info = '你執' + (o.myColor === 'w' ? '白' : '黑') + '方。對手：' + oppName;
+      } else info = '你正在觀戰。';
+    }
+    $('roomInfo').textContent = info;
+    const offer = !!(o.ready && d && o.myColor && d.drawOffer && d.drawOffer !== o.myColor && !result);
+    $('offerBox').hidden = !offer;
+    const seated = !!(o.ready && d && d.white && d.black);
+    const canAct = !!(o.myColor && seated && !result);
+    const offered = !!(d && o.myColor && d.drawOffer === o.myColor);
+    $('btnDraw').disabled = !canAct || offered;
+    $('btnDraw').textContent = offered ? '已提和' : '提和';
+    $('btnResign').disabled = !canAct;
+    $('btnResign').textContent = o.confirmResign ? '確定認輸？' : '認輸';
+    $('btnRematch').hidden = !(result && o.myColor);
+  }
+  function render() {
+    renderBoard();
+    renderPlayers();
+    renderStatus();
+    renderMoves();
+    renderButtons();
+    renderOnline();
+  }
+
+  // --- events ---
+  boardEl.addEventListener('click', e => {
+    const t = e.target.closest('[data-sq]');
+    if (t) onSquare(+t.dataset.sq);
+  });
+  document.querySelectorAll('.seg').forEach(seg => {
+    seg.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      const key = seg.dataset.key;
+      const v = key === 'level' ? +b.dataset.v : b.dataset.v;
+      if (settings[key] === v) return;
+      settings[key] = v;
+      if (key === 'level') { renderPlayers(); renderButtons(); }
+      else if (key === 'createColor') renderButtons();
+      else {
+        if (key === 'mode') { leaveRoom(); note(''); }
+        newGame();
+      }
+    });
+  });
+  $('btnNew').addEventListener('click', newGame);
+  $('btnUndo').addEventListener('click', undo);
+  $('btnFlip').addEventListener('click', () => { flipped = !flipped; render(); });
+
+  $('btnCreate').addEventListener('click', createRoom);
+  $('btnJoin').addEventListener('click', joinRoom);
+  $('joinCode').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom(); });
+  $('btnLast').addEventListener('click', () => enterRoom(getLast(), { claim: true }));
+  $('btnLeave').addEventListener('click', () => { note(''); exitRoom(); });
+  $('btnCopy').addEventListener('click', async () => {
+    if (!online) return;
+    try {
+      await navigator.clipboard.writeText(online.code);
+      note('已複製代碼 ' + online.code);
+    } catch (e) {
+      note('請手動輸入代碼：' + online.code);
+    }
+  });
+  $('btnDraw').addEventListener('click', () => {
+    if (!online || !online.myColor || result) return;
+    write({ drawOffer: online.myColor });
+  });
+  $('btnAccept').addEventListener('click', () => {
+    if (!online || !online.myColor || result) return;
+    write({ over: { type: 'agreed' }, drawOffer: null });
+  });
+  $('btnDecline').addEventListener('click', () => {
+    if (!online) return;
+    write({ drawOffer: null });
+  });
+  $('btnResign').addEventListener('click', () => {
+    const o = online;
+    if (!o || !o.myColor || result) return;
+    if (!o.confirmResign) {
+      o.confirmResign = true;
+      renderOnline();
+      o.crT = setTimeout(() => { if (online === o) { o.confirmResign = false; renderOnline(); } }, 3000);
+      return;
+    }
+    clearTimeout(o.crT);
+    o.confirmResign = false;
+    write({ over: { type: 'resign', winner: o.myColor === 'w' ? 'b' : 'w' }, drawOffer: null });
+    renderOnline();
+  });
+  $('btnRematch').addEventListener('click', () => {
+    const o = online;
+    if (!o || !o.data || !o.myColor || !result) return;
+    const d = o.data;
+    write({ white: d.black, black: d.white, moves: [], over: null, drawOffer: null, round: (d.round || 0) + 1, updated: Date.now() });
+  });
+  window.addEventListener('hashchange', () => {
+    const hm = (location.hash || '').match(HASH_RE);
+    if (!hm) return;
+    const code = hm[1].toUpperCase();
+    if (online && online.code === code) return;
+    settings.mode = 'online';
+    if (capsState !== 'ready') { wantRoom = code; newGame(); return; }
+    enterRoom(code, { claim: true });
+  });
+
+  async function initCaps() {
+    capsState = 'loading';
+    renderOnline();
+    try {
+      if (window.claude && window.claude.use) {
+        const res = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+        dbApi = res[0]; userApi = res[1];
+        if (userApi) {
+          myId = await userApi.id();
+          const cw = await userApi.can('data.write');
+          canWrite = cw !== false;
+        }
+      }
+    } catch (e) { /* stays unavailable */ }
+    capsState = (dbApi && myId) ? 'ready' : 'none';
+    renderOnline();
+    if (wantRoom && capsState === 'ready') {
+      const c = wantRoom;
+      wantRoom = null;
+      settings.mode = 'online';
+      enterRoom(c, { claim: true });
+    }
+  }
+  function start(data) {
+    data = data || {};
+    if (data.settings) Object.assign(settings, data.settings);
+    const hm = (location.hash || '').match(HASH_RE);
+    if (hm) { wantRoom = hm[1].toUpperCase(); settings.mode = 'online'; }
+    else if (settings.mode === 'online' && data.code && CODE_RE.test(data.code)) wantRoom = data.code;
+    resetState();
+    if (settings.mode !== 'online' && Array.isArray(data.moves)) {
+      for (const mv of data.moves) {
+        const m = legalMoves.find(x => x.from === mv.from && x.to === mv.to && x.promo === mv.promo);
+        if (!m) break;
+        applyMove(m);
+      }
+    }
+    flipped = typeof data.flipped === 'boolean' ? data.flipped : (settings.mode === 'cpu' && settings.human === 'b');
+    render();
+    maybeAI();
+    initCaps();
+  }
+  try {
+    window.claude?.hot?.snapshot?.(() => ({
+      settings: { ...settings },
+      flipped,
+      code: online ? online.code : null,
+      moves: settings.mode === 'online' ? [] : hist.map(h => ({ from: h.m.from, to: h.m.to, promo: h.m.promo }))
+    }));
+  } catch (e) { /* not inside a viewer */ }
+  if (window.claude?.hot?.ready) window.claude.hot.ready(start);
+  else start(window.claude?.hot?.data ?? {});
+})();
+</script>
+
+</body></html>
